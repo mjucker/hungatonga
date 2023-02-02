@@ -24,8 +24,8 @@ VAR1@missing_value= -999
 VAR1@_FillValue = -999
 P0 = 0.01*data2->P0       ; reference pressure [mb]
 PS = data3->PS
-hyam = data2->hyam  
-hybm = data2->hybm
+hyam = data2->HYA  
+hybm = data2->HYB
 lat = data1->lat    
 lon = data1->lon
 time = data1->time
@@ -36,8 +36,8 @@ phis = data3->PHIS
 ;pnew = (/  10, 20, 30, 50, 70,100,150,200,250 \
 ;           , 300,400,500,600,700,800,850,900,925,950,1000 /)  
 pnew = (/ 1, 2, 3, 5, 7, \
-    10, 15, 20, 30, 40, 50, 60, 75, 93, \
-    115, 140, 170, 200, 250, 300, 350, 400, 450, \
+    10, 15, 20, 30, 40, 50, 70, 100, \
+    150, 200, 250, 300, 350, 400, 450, \
     500, 550, 600, 700, 750, 800, 850, 900, 950 /)
 
 
@@ -71,8 +71,8 @@ VARnew&lev  =  pnew
 VARnew&lat  =  lat                     
 VARnew&lon  =  lon 
 
-VARnew@long_name = "Geopotential Height"
-VARnew@units     = "m"
+VARnew@long_name = "LONGNAME"
+VARnew@units     = "UNITS"
 
 ncdf->$vname$ = VARnew
 

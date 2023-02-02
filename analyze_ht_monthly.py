@@ -7,10 +7,13 @@ import os
 
 parallel_pval=True
 
-ctrldir = '/g/data/w40/mxj563/work/HungaTonga/mima/aqua_sponge_5yr/'
-pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/aqua_sponge_pert_5yr/'
+#ctrldir = '/g/data/w40/mxj563/work/HungaTonga/mima/aqua_sponge_10yr/'
+#pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/aqua_sponge_pert_10yr/'
 ctrldir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH/'
-pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_pert/'
+#pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_pert/'
+pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_oz/'
+#pertdir = '/scratch/w40/mxj563/mima/aqua_sponge_pert_10yr/'
+time_period = 7
 
 
 def AddMember(ds): 
@@ -72,7 +75,7 @@ ens['pert'] = pert_monthly
 ctrl_ens = []
 for member in pert_monthly.member:
         start = member.values+1
-        stop  = member.values+5
+        stop  = member.values+time_period
         ctrl_tmp = ctrl_monthly.sel(time=slice('{:04d}'.format(start),'{:04d}'.format(stop)))
         ctrl_tmp = ctrl_tmp.assign_coords({'time':pert_monthly.sel(member=member).time})
         ctrl_tmp['member'] = member

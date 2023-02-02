@@ -10,11 +10,16 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-i',dest='inFile',help='The file containing data on hybrid grid.')
 parser.add_argument('-o',dest='outFile',help='The file to write to.')
 parser.add_argument('-O',dest='overwrite',action='store_true',help='Overwrite existing files.')
+parser.add_argument('-t',dest='time_limit',default=None,type=int,nargs=2,help='Limit to given range of time steps. istart istop.')
 args = parser.parse_args()
 
 if not os.path.isfile('hybrid2pressure.template.ncl'):
     raise IOError('CANNOT PROCEED: NEED FILE hybrid2pressure.template.ncl IN WORKING DIRECTORY.')
-    
+
+if args.time_limit is not None:
+    tsel = {'time':slice(args.time_limit[0],args.time_limit[1])}
+else:
+    tsel = None
 
 overwrite = args.overwrite
 
@@ -24,8 +29,10 @@ outFile2d  = args.outFile.replace('.nc','.2d.nc')
 
 enc={'time':{'dtype':float}}
 
-vars_3d = ['O3','Z3','Q','U','V','T','RELHUM','UU','VV','VQ','VU','VT','QRS','QRL','OMEGA','CLOUD','CLDICE','CLDLIQ','TH']
-vars_2d = ['CLDHGH','CLDLOW','CLDMED','CLDTOT','FLDS','FLDSC','FLUT','FLUTC','FSDS','FSDSC','FSNS','FSNSC','ICEFRAC','LANDFRAC','LHFLX','LWCF','OCNFRAC','PBLH','PHIS','PRECC','PRECL','PRECSC','PRECSL','PSL','SHFLX','SWCF','TMQ','TROPP_FD','TS','TSMN','TSMX']
+#vars_3d = ['O3','Z3','Q','U','V','T','RELHUM','UU','VV','VQ','VU','VT','VTH3d','QRS','QRL','OMEGA','CLOUD','CLDICE','CLDLIQ','TH']
+vars_3d = ['O3','Z3','Q','U','V','T','TH','UV3d','VTH3d','UW3d','QRS','QRL','OMEGA','CLOUD','CLDICE','CLDLIQ']
+#vars_2d = ['CLDHGH','CLDLOW','CLDMED','CLDTOT','FLDS','FLDSC','FLNT','FLNTC','FSDS','FSDSC','FSNS','FSNSC','ICEFRAC','LANDFRAC','LHFLX','LWCF','OCNFRAC','PBLH','PHIS','PRECC','PRECL','PRECSC','PRECSL','PSL','SHFLX','SWCF','TMQ','TROPP_FD','TS','TSMN','TSMX','TREFHT',]
+vars_2d = ['CLDTOT','FLNT','FLNTC','FSDS','FSDSC','LANDFRAC','PHIS','PRECC','PRECL','PRECSC','PRECSL','PSL','TMQ','TROPP_FD','TS','TSMN','TSMX','TREFHT',]
 
 def WriteFile(ds,name,enc=None):
     from dask.diagnostics import ProgressBar
@@ -39,18 +46,18 @@ gridFile = 'level_grid.nc'
 comp = None
 atmos = None
 if not os.path.isfile(outFile3d) or overwrite:
-    comp = xr.open_dataset(dataFile,chunks={'time':1})
+    comp = xr.open_dataset(dataFile,chunks={'time':1}).isel(tsel)
     dat3d = []
     for var in vars_3d:
         if var in comp and len(comp[var].coords) > 1:
-            if 'lev' in comp[var].coords:
+            if 'lev' in comp[var].coords or 'ilev' in comp[var].coords:
                 dat3d.append(comp[var])
     atmos = xr.merge(dat3d)
     WriteFile(atmos,outFile3d,enc=enc)
 
 if not os.path.isfile(outFile2d) or overwrite:
     if comp is None:
-        comp = xr.open_dataset(dataFile)
+        comp = xr.open_dataset(dataFile).isel(tsel)
     dat2d = []
     for var in vars_2d:
         if var in comp and len(comp[var].coords) > 1:
@@ -60,13 +67,13 @@ if not os.path.isfile(outFile2d) or overwrite:
 
 if not os.path.isfile('data3.nc') or overwrite:
     if comp is None:
-        comp = xr.open_dataset(dataFile)
+        comp = xr.open_dataset(dataFile).isel(tsel)
     out = xr.merge([comp.PS,comp.TS,comp.PHIS])
     WriteFile(out,'data3.nc')
 
 if not os.path.isfile('level_grid.nc') or overwrite:
     if comp is None:
-        comp = xr.open_dataset(dataFile)
+        comp = xr.open_dataset(dataFile).isel(tsel)
     grid = xr.merge([comp.hyam,comp.hybm,comp.P0,comp.hybi,comp.hyai])
     WriteFile(grid,'level_grid.nc')
 print('DONE. YOU WILL NOW HAVE TO INTERPOLATE 3D DATA ONTO PRESSURE LEVELS.')
@@ -83,8 +90,17 @@ for var in atmos.data_vars:
             new_file = ncl_template.replace('INFILE',outFile3d)
             new_file = new_file.replace('OUTFILE','{0}.nc'.format(var))
             new_file = new_file.replace('VARNAME',var)
+            if 'ilev' in atmos[var].coords:
+                ya = 'hyai'
+                yb = 'hybi'
+            else:
+                ya = 'hyam'
+                yb = 'hybm'
+            new_file = new_file.replace('HYA',ya).replace('HYB',yb)
             new_file = new_file.replace('GRIDFILE','level_grid.nc')
             new_file = new_file.replace('DATA3FILE','data3.nc')
+            new_file = new_file.replace('LONGNAME',atmos[var].attrs['long_name'])
+            new_file = new_file.replace('UNITS',atmos[var].attrs['units'])
             script_name = 'hybrid2pressure.{0}.ncl'.format(var)
             ncl_file = open(script_name,'w')
             ncl_file.write(new_file)
