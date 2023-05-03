@@ -1,13 +1,26 @@
 import xarray as xr
 from aostools import climate as ac
+from aostools import inout as ai
 from glob import glob
 from dask.diagnostics import ProgressBar
 import os
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('-c',dest='case',default='100Tg')
+args = parser.parse_args()
 
-keep_vars = ['O3','U','T','TS','TREFHT','Q','PSL','PRECC','PRECL','PRECSC','PRECSL','Z3','TCO','OMEGA','FLNT','CLDICE']
+keep_vars = ['O3','U','V','T','TS','TREFHT','Q','PSL','PRECC','PRECL','PRECSC','PRECSL','Z3','TCO','OMEGA','FLNT','CLDICE','U10','V10']
 
 sum_vars = {'PREC':['PRECC','PRECL','PRECSC','PRECSL']}
 
+do_not_compress = ['Q','CLDICE']
+
+case = args.case
+
+sim_lengths = {'100Tg' : 10,
+               '300Tg' : 5,
+               '80Tg'  : 7
+               }
 
 #ctrlfile = '/g/data/hh5/tmp/dd7103/Sept25-HungaTunga-PI/HungaTungaPI_monthly-06to36.nc'
 #pertdir = '/g/data/hh5/tmp/dd7103/Hunga-Tunga-ensemble/merged-data/monthly/'
@@ -18,11 +31,14 @@ sum_vars = {'PREC':['PRECC','PRECL','PRECSC','PRECSL']}
 #member_length = 5
 
 ctrlfile = '/g/data/w40/mxj563/work/HungaTonga/waccm/F2000/F2000_HungaTunga_control_monthly-06to44yr.interp.nc'
-pertdir  = '/g/data/w40/mxj563/work/HungaTonga/waccm/F2000/ensemble/old/'
+#ctrlfile = '/scratch/w40/mxj563/sh_met_book/F2000_HungaTonga_control_monthly-06to44yr.interp.nc'
+pertdir  = '/g/data/w40/mxj563/work/HungaTonga/waccm/F2000/{0}/ensemble/'.format(case)
+#pertdir  = '/g/data/w40/mxj563/work/HungaTonga/waccm/F2000/ensemble/high_top/'
 #pertdir = '/scratch/w40/mxj563/hungatonga/tmp/'
-member_length = 10
+
+member_length = sim_lengths[case]
 #ctrlfile = '/g/data/w40/mxj563/work/HungaTonga/waccm/PI/HungaTungaPI_monthly-06to36.interp.nc'
-#pertdir  = '/g/data/w40/mxj563/work/HungaTonga/waccm/PI/ensemble/'
+#pertdir q = '/g/data/w40/mxj563/work/HungaTonga/waccm/PI/ensemble/'
 #member_length = 2
 
 def AddMember(ds):
@@ -69,14 +85,15 @@ files.sort()
 tmp = xr.open_dataset(files[0],decode_times=False)
 zero_time = DecodeDs(tmp).time
 
-pert = xr.open_mfdataset(files,preprocess=AddMember,concat_dim='member')
+pert = xr.open_mfdataset(files,preprocess=AddMember,combine='nested',concat_dim='member')
 pert = CleanVars(pert)
 # restrict to member_length
 pert = pert.isel(time=slice(None,12*member_length))
 # add TCO
 pert['TCO'] = ac.TotalColumnOzone(pert['O3'],pert['T'])
 
-keep_vars.append('TCO')
+if 'TCO' not in keep_vars:
+    keep_vars.append('TCO')
 
 ens = {'pert':pert}
 # convert ctrl into ensemble
@@ -96,7 +113,9 @@ ens['ctrl'] = xr.concat(ctrl_ens,'member')
 # write ensemble files
 for key in ens.keys():
     outFile = 'waccm_{0}_ens.nc'.format(key)
-    delayed = ens[key].to_netcdf(outFile,compute=False)
+    cvars = [var for var in ens[key].data_vars if var not in do_not_compress]
+    enc = ai.DefCompress(ens[key],cvars)
+    delayed = ens[key].to_netcdf(outFile,encoding=enc,compute=False)
     print(outFile)
     with ProgressBar():
         delayed.compute()

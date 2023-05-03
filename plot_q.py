@@ -63,7 +63,7 @@ tqm = 1e-9*tq.mean('member').isel(time=slice(0,nmonths))
 wlifetime,whalftime,ppm,ppy,amp = fc.ExpFit(wtime,tqm)
 print('WACCM first {0} months rate = {1:.2f}% per month'.format(nmonths,ppm))
 # then, for the longer term
-fit_years = 7
+fit_years = 5
 wtime = np.linspace(eps,fit_years-eps,12*fit_years)
 tqm = 1e-9*tq.mean('member').isel(time=slice(0,12*fit_years))
 wlifetime,whalftime,ppm,ppy,amp = fc.ExpFit(wtime,tqm)
@@ -87,11 +87,17 @@ axs[1].set_xlabel('time [years since eruption]')
 axs[0].set_ylabel('mass anomaly [Tg]')
 axs[1].set_ylabel('mass anomaly [Tg]')
 #ax.set_title('Total stratospheric water mass [Tg]')
-tdat = axs[0].get_children()[2].get_xdata()
-axs[0].set_xlim(tdat[0],tdat[-1])
+try:
+    tdat = axs[0].get_children()[0].get_xdata()
+    axs[0].set_xlim(tdat[0],tdat[-1])
+except:
+    print('OBS: could not adjust xlims')
 fc.SaveFig(fig,'figures/tQ.pdf')
 if not same_fig:
-    axs[1].set_xlim(tdat[0],tdat[-1])
+    try:
+        axs[1].set_xlim(tdat[0],tdat[-1])
+    except:
+        print('OBS: could not adjust xlims')
     fc.SaveFig(fig2,'figures/tPSC.pdf')
 
 

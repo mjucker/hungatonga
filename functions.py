@@ -112,6 +112,14 @@ def GlobalMeanPlot(ta,name=None,fig_out=False,fig=None,ax=None,ttle=None,pval_pa
         fig.savefig(outFile,bbox_inches='tight',transparent=True)
         print(outFile)
 
+def ConvertTime2Years(ds):
+    fyr = []
+    for t in ds.time:
+        fyr.append(t.dt.year-1 + t.dt.dayofyear/365)
+    fyr = xr.DataArray(fyr,[('time',fyr)],name='time')
+    fyr.attrs['units'] = 'years'
+    return ds.assign_coords(time=fyr)
+
 
 def ReadMLS(pure_anom=False):
     mls  = xr.open_dataset('MLS_data.nc')
@@ -129,9 +137,23 @@ def ReadMLS(pure_anom=False):
 
 def ReadMLSMap():
     mls = xr.open_dataset('MLS_data.nc')
-    mls = mls.assign_coords({'Map_Time':mls.map_time,'Map_Long':mls.map_lon,'Map_Lat':mls.map_lat})
-    mls = mls.isel(Map_Long=slice(0,-1))
-    mls = mls.rename({'Map_Time':'time','Map_Long':'lon','Map_Lat':'lat'})
+    time_name = None
+    lon_name = None
+    lat_name = None
+    renames = {}
+    for coord in mls.coords:
+        if 'time' in coord.lower():
+            time_name = coord
+            renames[coord] = 'time'
+        elif 'lon' in coord.lower():
+            mls = mls.isel({coord:slice(0,-1)})
+            lon_name = coord
+            renames[coord] = 'lon'
+        elif 'lat' in coord.lower():
+            lat_name = coord
+            renames[coord] = 'lat'
+    #mls = mls.assign_coords({'Map_Time':mls.map_time,'Map_Long':mls.map_lon,'Map_Lat':mls.map_lat})
+    mls = mls.rename(renames)
     mls.time.attrs['units'] = 'days since 0001-01-01'
     mls.time.attrs['calendar'] = 'noleap'
     mls = xr.decode_cf(mls)
@@ -167,3 +189,20 @@ def ExpFit(x,y):
     percent_per_month = (1-np.exp(fit[0]*1/12))*100
     percent_per_year  = (1-np.exp(fit[0]*1   ))*100
     return lifetime,halftime,percent_per_month,percent_per_year,fit[1]
+
+
+def AddBox(ax,region,colr):
+    from shapely import geometry
+    from cartopy import crs as ccrs
+    if region['lon'].start > 180:
+        lonstart = region['lon'].start - 360
+    else:
+        lonstart = region['lon'].start
+    if region['lon'].stop > 180:
+        lonstop = region['lon'].stop - 360
+    else:
+        lonstop = region['lon'].stop
+    geom = geometry.box(minx=lonstart,maxx=lonstop,
+                                    miny=region['lat'].start,maxy=region['lat'].stop)
+    #geoms.append(geom)
+    ax.add_geometries([geom],edgecolor=colr,facecolor='none',crs=ccrs.PlateCarree(),zorder=5)

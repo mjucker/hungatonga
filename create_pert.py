@@ -8,7 +8,7 @@ restart_file = 'mima/spectral_dynamics.res.nc'
 
 grid = xr.open_dataset(grid_file,decode_times=False)
 
-# vertical profile from LMS
+# vertical profile from MLS
 vertical_profile = [0,0.0899847,0.164989,0.211891,0.2258881,0.165305,0.0463565,0.00805761,0.0137417,0.0234326,0.0121541,0.00193966]
 p1 = [100,82.5404,56.2341,38.3119,26.1016,17.7828,12.1153,8.25404,5.62341,3.83119,2.61016,1]
 fprof = xr.DataArray(vertical_profile,coords=[('pfull',p1)],name='prof')
@@ -30,7 +30,9 @@ lam0 = 184.6
 dphi = 5
 dlam = 10
 #dz = 5.5
+# change amplitude to change total mass
 amp = 4.25e-4
+amp = 4.25e-4*100/80
 
 #gauss = amp*np.exp(-(z-z0)**2/dz**2)*np.exp(-(lat-phi0)**2/dphi**2)*np.exp(-(lon-lam0)**2/dlam**2)
 

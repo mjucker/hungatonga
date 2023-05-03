@@ -27,16 +27,22 @@ dataFile = args.inFile
 outFile3d  = args.outFile.replace('.nc','.3d.nc')
 outFile2d  = args.outFile.replace('.nc','.2d.nc')
 
-enc={'time':{'dtype':float}}
 
 #vars_3d = ['O3','Z3','Q','U','V','T','RELHUM','UU','VV','VQ','VU','VT','VTH3d','QRS','QRL','OMEGA','CLOUD','CLDICE','CLDLIQ','TH']
 vars_3d = ['O3','Z3','Q','U','V','T','TH','UV3d','VTH3d','UW3d','QRS','QRL','OMEGA','CLOUD','CLDICE','CLDLIQ']
 #vars_2d = ['CLDHGH','CLDLOW','CLDMED','CLDTOT','FLDS','FLDSC','FLNT','FLNTC','FSDS','FSDSC','FSNS','FSNSC','ICEFRAC','LANDFRAC','LHFLX','LWCF','OCNFRAC','PBLH','PHIS','PRECC','PRECL','PRECSC','PRECSL','PSL','SHFLX','SWCF','TMQ','TROPP_FD','TS','TSMN','TSMX','TREFHT',]
-vars_2d = ['CLDTOT','FLNT','FLNTC','FSDS','FSDSC','LANDFRAC','PHIS','PRECC','PRECL','PRECSC','PRECSL','PSL','TMQ','TROPP_FD','TS','TSMN','TSMX','TREFHT',]
+vars_2d = ['CLDTOT','FLNT','LANDFRAC','PHIS','PRECC','PRECL','PRECSC','PRECSL','PSL','TMQ','TROPP_FD','TS','TSMN','TSMX','TREFHT','U10','V10']
+
+## for MiMA input
+vars_3d = ['O3','Q','U','V','T','Z3']
+vars_2d = ['TS','PHIS']
+
 
 def WriteFile(ds,name,enc=None):
     from dask.diagnostics import ProgressBar
     print('writing file',name)
+    if 'time' in ds.coords and enc is None:
+        enc={'time':{'dtype':float}}
     delayed = ds.to_netcdf(name,encoding=enc,compute=False)
     with ProgressBar():
         delayed.compute()
@@ -49,18 +55,18 @@ if not os.path.isfile(outFile3d) or overwrite:
     comp = xr.open_dataset(dataFile,chunks={'time':1}).isel(tsel)
     dat3d = []
     for var in vars_3d:
-        if var in comp and len(comp[var].coords) > 1:
-            if 'lev' in comp[var].coords or 'ilev' in comp[var].coords:
+        if var in comp and len(comp[var].dims) > 1:
+            if 'lev' in comp[var].dims or 'ilev' in comp[var].dims:
                 dat3d.append(comp[var])
     atmos = xr.merge(dat3d)
-    WriteFile(atmos,outFile3d,enc=enc)
+    WriteFile(atmos,outFile3d)
 
 if not os.path.isfile(outFile2d) or overwrite:
     if comp is None:
         comp = xr.open_dataset(dataFile).isel(tsel)
     dat2d = []
     for var in vars_2d:
-        if var in comp and len(comp[var].coords) > 1:
+        if var in comp and len(comp[var].dims) > 1:
             dat2d.append(comp[var])
     SFC = xr.merge(dat2d)
     WriteFile(SFC,outFile2d)

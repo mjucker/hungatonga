@@ -18,7 +18,9 @@ keep_vars = ['UV3d','VTH3d','UW3d','TH','U','T']
 #member_length = 5
 
 ctrlfile = '/g/data/w40/mxj563/work/HungaTonga/waccm/F2000/F2000_HungaTunga_control_monthly-06to44yr.interp.nc'
+#ctrlfile = '/scratch/w40/mxj563/sh_met_book/F2000_HungaTonga_control_monthly-06to44yr.interp.nc'
 pertdir  = '/g/data/w40/mxj563/work/HungaTonga/waccm/F2000/ensemble/'
+#pertdir  = '/g/data/w40/mxj563/work/HungaTonga/waccm/F2000/ensemble/high_top/'
 #pertdir = '/scratch/w40/mxj563/hungatonga/tmp/'
 member_length = 10
 #ctrlfile = '/g/data/w40/mxj563/work/HungaTonga/waccm/PI/HungaTungaPI_monthly-06to36.interp.nc'
