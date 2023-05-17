@@ -1,9 +1,9 @@
 import xarray as xr
 import numpy as np
 
-grid_file = 'mima/atmos_daily.nc'
+grid_file = 'atmos_daily.nc'
 
-restart_file = 'mima/spectral_dynamics.res.nc'
+restart_file = 'RESTART/spectral_dynamics.res.nc'
 
 
 grid = xr.open_dataset(grid_file,decode_times=False)
@@ -32,7 +32,7 @@ dlam = 10
 #dz = 5.5
 # change amplitude to change total mass
 amp = 4.25e-4
-amp = 4.25e-4*100/80
+amp = 4.25e-4*200/80
 
 #gauss = amp*np.exp(-(z-z0)**2/dz**2)*np.exp(-(lat-phi0)**2/dphi**2)*np.exp(-(lon-lam0)**2/dlam**2)
 

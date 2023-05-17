@@ -16,6 +16,7 @@ parser.add_argument('-m',dest='model',default='waccm',help='Choose model/run to 
 parser.add_argument('-v',dest='vars',default=None,nargs='+')
 args = parser.parse_args()
 model = args.model
+qmodel = fc.ModName(model)
 sns.set_context('paper')
 sns.set_style('whitegrid')
 colrs = sns.color_palette()
@@ -25,9 +26,13 @@ if args.vars is None:
 else:
     fields = args.vars
 
-yrolls= [1,2,3,4,5]
+yrolls= [1]
 
-var_fields = {'TS':'TREFHT'}
+var_fields = {'waccm':{'TS':'TREFHT'},
+              'mima' : {},
+              'hthh':{},
+              'bench_SH':{},
+              }
 
 cmap_vars = {'TS':'t','P':'precip','OLR':'olr','SLP':'slp','default':'RdBu_r'}
 
@@ -53,17 +58,20 @@ labls = {
 #        in the simulation, which is up to 120 months!
 
 # create maps by season
-sTS = xr.open_dataset('{0}_season_delta_ens.nc'.format(model))
-sCT = xr.open_dataset('{0}_season_ctrl_ens.nc'.format(model))
+sTS = xr.open_dataset('{0}_season_delta_ens.nc'.format(model),decode_times=False)
+sCT = xr.open_dataset('{0}_season_ctrl_ens.nc'.format(model),decode_times=False)
+sTS,_,_ = fc.CorrectTime(sTS)
+sCT,_,_ = fc.CorrectTime(sCT)
+
 #sTS = dTS.resample(time='QS-DEC').mean()
 #sCT = CT.resample(time='QS-DEC').mean()
 
 seasons = np.unique(sTS.time.dt.season)
 # plot per variable per roll per season, 1 panel for each rolling year
 for f,field in enumerate(fields):
-    var = fc.variables[model][field]
-    if var in var_fields.keys():
-        var = var_fields[var]
+    var = fc.variables[qmodel][field]
+    if var in var_fields[qmodel].keys():
+        var = var_fields[qmodel][var]
     if field in cmap_vars.keys():
         cmap = at.cmaps[cmap_vars[field]]
     else:
@@ -89,7 +97,7 @@ for f,field in enumerate(fields):
                 ax.coastlines()
                 ax.set_title('year {0}'.format(time.dt.year.values))
             fig.suptitle('{0}, {1}, {2}-year rolling mean'.format(labls[field],seas,roll))
-            ac.AddPanelLabels(axs,'upper left',ypos=1.1) 
+            ac.AddPanelLabels(axs,'upper left',ypos=1.2) 
             outFile = 'figures/{0}_{1}_{2}_roll{3}_maps.pdf'.format(model,field,seas,roll)
             fig.savefig(outFile,bbox_inches='tight',transparent=True)
             print(outFile)

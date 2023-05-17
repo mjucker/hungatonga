@@ -9,15 +9,26 @@ sns.set_context('paper')
 sns.set_style('whitegrid')
 sns.set_palette('tab10')
 colrs = sns.color_palette()
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('-m',dest='model',default='waccm',help='Choose model/run to plot.')
+args = parser.parse_args()
+model = args.model
+qmodel = fc.ModName(model)
+Q = fc.variables[qmodel]['Q']
 
 limits = [1,100]
 
 same_fig = False
 
-pert = xr.open_dataset('waccm_pert_ens.nc',decode_times=False)#.Q
-pert = xr.merge([pert.Q,pert.CLDICE])
-ctrl = xr.open_dataset('waccm_ctrl_ens.nc',decode_times=False)#.Q
-ctrl = xr.merge([ctrl.Q,ctrl.CLDICE])
+pert = xr.open_dataset(model+'_pert_ens.nc',decode_times=False)#.Q
+if 'CLDICE' not in pert.data_vars:
+    pert['CLDICE'] = pert[Q]*0
+pert = xr.merge([pert[Q],pert.CLDICE])
+ctrl = xr.open_dataset(model+'_ctrl_ens.nc',decode_times=False)#.Q
+if 'CLDICE' not in ctrl.data_vars:
+    ctrl['CLDICE'] = pert[Q]*0
+ctrl = xr.merge([ctrl[Q],ctrl.CLDICE])
 mls = fc.ReadMLS(pure_anom=True)
 mls  = mls.sel(time=slice('0001-01-01',None))
 tq_mls = mls.anom
@@ -26,11 +37,17 @@ dTS = pert - ctrl
 #dTS,_,_ = fc.CorrectTime(dTS.to_dataset())
 dTS,_,_ = fc.CorrectTime(dTS)
 dCI = dTS.CLDICE
-dTS = dTS.Q
+dTS = dTS[Q]
 
-sphum = dTS.sel(lev=slice(*limits))
-cldiceS= dCI.sel(lat=slice(-90,-60),lev=slice(*limits))
-cldiceN= dCI.sel(lat=slice(60,90),lev=slice(*limits))
+dimNames = ac.FindCoordNames(dTS)
+lev = dimNames['pres']
+lat = dimNames['lat']
+if dTS[lev][0] > dTS[lev][-1]:
+    limits = limits[::-1]
+
+sphum = dTS.sel({lev:slice(*limits)})
+cldiceS= dCI.sel({lat:slice(-90,-60),lev:slice(*limits)})
+cldiceN= dCI.sel({lat:slice(60,90),lev:slice(*limits)})
 tq = ac.GlobalMass(sphum)
 tcS = ac.GlobalMass(cldiceS)
 tcN = ac.GlobalMass(cldiceN)
@@ -44,7 +61,7 @@ else:
     fig,ax = plt.subplots()
     fig2,ax2 = plt.subplots()
     axs = [ax,ax2]
-fc.GlobalMeanPlot(tq*1e-9,name=None,fig=fig,ax=axs[0],color=colrs[3],label='WACCM')
+fc.GlobalMeanPlot(tq*1e-9,name=None,fig=fig,ax=axs[0],color=colrs[3],label=model.upper())
 tq_mls_mn = tq_mls.resample(time='1M',label='left',loffset='16D').mean()
 p = tq_mls_mn.plot(ax=axs[0],label='MLS',color=colrs[0],lw=2,ls='-')
 axs[0].legend()
@@ -61,13 +78,13 @@ nmonths = 6
 wtime = np.linspace(eps,nmonths/12-eps,nmonths)
 tqm = 1e-9*tq.mean('member').isel(time=slice(0,nmonths))
 wlifetime,whalftime,ppm,ppy,amp = fc.ExpFit(wtime,tqm)
-print('WACCM first {0} months rate = {1:.2f}% per month'.format(nmonths,ppm))
+print(model.upper()+' first {0} months rate = {1:.2f}% per month'.format(nmonths,ppm))
 # then, for the longer term
 fit_years = 5
 wtime = np.linspace(eps,fit_years-eps,12*fit_years)
 tqm = 1e-9*tq.mean('member').isel(time=slice(0,12*fit_years))
 wlifetime,whalftime,ppm,ppy,amp = fc.ExpFit(wtime,tqm)
-print('WACCM rate [percent per month] = {0:6.2f}'.format(ppm))
+print(model.upper()+' rate [percent per month] = {0:6.2f}'.format(ppm))
 axs[0].text(0.8,labl1,r'$\tau_{0} = ${1:3.1f} yrs'.format('{1/2}',whalftime),transform=axs[0].transAxes,color='r',backgroundcolor='white')
 axs[0].plot(tqm.time,np.exp(amp)*np.exp(-wtime/wlifetime),color='r',lw=1,ls=':')
 nt = len(tq_mls_mn.time)
@@ -92,12 +109,12 @@ try:
     axs[0].set_xlim(tdat[0],tdat[-1])
 except:
     print('OBS: could not adjust xlims')
-fc.SaveFig(fig,'figures/tQ.pdf')
+fc.SaveFig(fig,'figures/{0}_tQ.pdf'.format(model))
 if not same_fig:
     try:
         axs[1].set_xlim(tdat[0],tdat[-1])
     except:
         print('OBS: could not adjust xlims')
-    fc.SaveFig(fig2,'figures/tPSC.pdf')
+    fc.SaveFig(fig2,'figures/{0}_tPSC.pdf'.format(model))
 
 

@@ -12,6 +12,7 @@ import numpy as np
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('-m',dest='model',help='Choose model/run to plot.')
+parser.add_argument('-v',dest='vars',default=None,nargs='+')
 args = parser.parse_args()
 model = args.model
 sns.set_context('paper')
@@ -19,9 +20,11 @@ sns.set_style('whitegrid')
 colrs = sns.color_palette()
 
 fields = ['OLR','P','SLP','TS']
+if args.vars is not None:
+    fields = args.vars
 
-rolls = [1,3,6,12,24,36,48,60]
-yrolls= [1,2,3,4,5]
+rolls = [1,3,6,12]#,24,36,48,60]
+yrolls= [1]#,2,3,4,5]
 
 var_fields = {'TS':'TREFHT'}
 

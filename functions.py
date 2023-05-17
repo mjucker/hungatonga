@@ -37,25 +37,40 @@ def MakeDataFrame(ds,colname):
     df = pd.DataFrame(data={colname:cls,'member':memb,'year':years,ds.name:vals})
     return df
 
-def CorrectTime(ds):
+def CorrectTime(ds,decode=True):
     calendar = ds.time.attrs['calendar']
     units = ds.time.attrs['units']
-    if calendar == 'noleap': #waccm
+    if calendar.lower() == 'noleap': #waccm
         daysperyear = 365
         mid_month   = 0 #this is now fixed
     else:
         daysperyear = 360
         mid_month   = 0
-    num_years = ds.time[0]//daysperyear
-    ntime = ds.time - num_years*daysperyear + mid_month
-    ntime.attrs = ds.time.attrs
-    return xr.decode_cf(ds.assign_coords(time=ntime)),units,calendar
+    if ds.time[0] == 0:
+        startyear = int(units.split('since ')[-1].split('-')[0])
+        startmonth= int(units.split('-')[1].split('-')[0])
+        if startmonth == 12: #start with DJF
+            correctyear = 0
+        else:
+            correctyear = 1
+        units = units.replace('{:04d}'.format(30),'{:04d}'.format(correctyear))
+        ds.time.attrs['units'] = units
+        return xr.decode_cf(ds),units,calendar
+    else:
+        num_years = ds.time[0]//daysperyear
+        ntime = ds.time - num_years*daysperyear + mid_month
+        ntime.attrs = ds.time.attrs
+        ds = ds.assign_coords(time=ntime)
+    if decode:
+        ds = xr.decode_cf(ds)
+    return ds,units,calendar
 
 
 def GlobalMeanPlot(ta,name=None,fig_out=False,fig=None,ax=None,ttle=None,pval_parallel=True,plim=0.1,label='_none_',color=None):
     from matplotlib import pyplot as plt
     import cftime
     import nc_time_axis
+    ta = ta.convert_calendar('noleap',align_on='date')
     pval = ac.StatTest(ta,0,'T','member',parallel=pval_parallel)
 #    pval = ac.StatTest(ta,None,'sign','member',parallel=pval_parallel)
     if fig is None and ax is None:
@@ -162,21 +177,31 @@ def ReadMLSMap():
 
 variables = {'waccm': {'T':'T','U':'U','SLP':'PSL','O3':'O3','TS':'TS','TREFHT':'TREFHT','Q':'Q','P':'PREC','TCWV':'TMQ','TCO':'TCO','OLR':'FLNT','OMEGA':'OMEGA','TH':'TH','VTH3d':'VTH3d'},
              'mima' : {'T':'temp','U':'ucomp','SLP':'slp','TS':'t_surf','Q':'sphum','P':'precip','OLR':'olr','TCWV':'tcwv'}}
-for mod in ['aqua','aqua_sponge','aqua_sponge_10yr','bench_SH']:
+for mod in ['aqua','aqua_sponge','aqua_sponge_10yr','bench_SH','hthh','hthh']:
     variables[mod] = variables['mima']
 
 
+def ModName(model):
+    if '_' in model:
+        qmodel = '_'.join(model.split('_')[:-1])
+    else:
+        qmodel = model
+    return qmodel
+    
 def Mass(ds):
     '''mass above a given pressure level, in kg/m2.
     '''
     from aostools.constants import g,a0,coslat
+    from aostools import climate as ac
+    names = ac.FindCoordNames(ds)
+    lev = names['pres']
     mass_y = ds
     #mass_y = coslat(ds['lat'])*ds
     #mass_y = a0*ds/np.deg2rad(coslat(ds['lat']).integrate('lat'))
     #mass_p = mass_y.mean('lon').integrate('lev')*100
-    mass_p = mass_y.integrate('lev')*100
+    mass_p = mass_y.integrate(lev)*100
     mass = mass_p/g
-    if ds.lev[0] > ds.lev[-1]:
+    if ds[lev][0] > ds[lev][-1]:
         mass = -mass
     return mass
 

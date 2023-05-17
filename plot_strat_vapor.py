@@ -8,38 +8,61 @@ from matplotlib import pyplot as plt
 import matplotlib.dates as mdates
 from hungatonga import functions as fc
 import os
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('-m',dest='model',default='waccm',help='Choose model/run to plot.')
+args = parser.parse_args()
+model = args.model
 
 sns.set_context('paper')
 sns.set_style('whitegrid')
 
 def ReadFile(file):
     ds = xr.open_dataset(file,decode_times=False)
+    ds,units,cal = fc.CorrectTime(ds,decode=False)
     attrs = ds.time.attrs
-    ds = ds.assign_coords(time=(ds.time-5*365)/365)
+    if cal.lower() == 'noleap':
+        daysperyear = 365
+    else:
+        daysperyear = 360
+    ds = ds.assign_coords(time=(ds.time/daysperyear))
     ds.time.attrs['units'] = 'years'
     #ds.time.attrs['calendar'] = attrs['calendar']
     return xr.decode_cf(ds)
 
-pert_file = 'waccm_pert_ens.nc'
-ctrl_file = 'waccm_ctrl_ens.nc'
-pert = ReadFile(pert_file).sel(lev=slice(1,100))
-ctrl = ReadFile(ctrl_file).sel(lev=slice(1,100))
-pert = xr.merge([pert.Q,pert.CLDICE])
-ctrl = xr.merge([ctrl.Q,ctrl.CLDICE])
+qmodel = fc.ModName(model)
+Q = fc.variables[qmodel]['Q']
+pert_file = model+'_pert_ens.nc'
+ctrl_file = model+'_ctrl_ens.nc'
+pert = ReadFile(pert_file)
+ctrl = ReadFile(ctrl_file)
+lev = ac.FindCoordNames(pert)['pres']
+if model.lower() == 'waccm':
+    levslice = {lev:slice(1,100)}
+else:
+    levslice = {lev:slice(100,1)}
+pert = pert.sel(levslice)
+ctrl = ctrl.sel(levslice)
+if not 'CLDICE' in pert.data_vars:
+    pert['CLDICE'] = 0*pert[Q]
+    ctrl['CLDICE'] = 0*ctrl[Q]
+pert = xr.merge([pert[Q],pert.CLDICE])
+ctrl = xr.merge([ctrl[Q],ctrl.CLDICE])
+
 do_daily = False
 pert_file_d = 'waccm_daily_pert_ens.nc'
 if os.path.isfile(pert_file_d):
     do_daily = True
-    pert_d = ReadFile(pert_file_d).sel(lev=slice(1,100))
+    pert_d = ReadFile(pert_file_d).sel(levslice)
     pert_d = xr.merge([pert_d.CLDICE,pert_d.Q])
 
 def MassPerDeg(ds):
     from aostools.constants import a0,g,coslat
     mass_y = coslat(ds.lat)*ds
     mass_x = np.deg2rad(mass_y.integrate('lon'))
-    mass_p = mass_x.integrate('lev')*100
+    mass_p = mass_x.integrate(lev)*100
     mass = a0**2/g*mass_p
-    if ds.lev[0] > ds.lev[-1]:
+    if ds[lev][0] > ds[lev][-1]:
         mass = -mass
     return mass
 
@@ -52,8 +75,8 @@ def PlotMass(mass,tco=None,appendix='',levels=20,colr=None,fig_out=False,kind='a
         ax = fig.add_axes([0.1,0.1,0.74,0.8])
     cmass = None
     if isinstance(mass,xr.Dataset):
-        if 'Q' in mass.data_vars:
-            qmass = mass.Q
+        if Q in mass.data_vars:
+            qmass = mass[Q]
         if 'CLDICE' in mass.data_vars:
             cmass = mass.CLDICE
     else:
@@ -67,7 +90,7 @@ def PlotMass(mass,tco=None,appendix='',levels=20,colr=None,fig_out=False,kind='a
     if cmass is not None and 'member' in cmass.coords:
         cval = ac.StatTest(cmass,0,'T','member',parallel=True)
         cmass = cmass.mean('member').where(cval<0.1)
-    if qmass.name == 'Q':
+    if qmass.name == Q:
         cmap = 'Reds'
     else:
         cmap = 'RdBu_r'
@@ -126,11 +149,15 @@ mls = fc.ReadMLS(True).sel(time=slice('0001-01-01',None))
 anom_hm = mls.anom_hm.resample(time='1M',label='left',loffset='14D').mean()
 anom_hm = fc.ConvertTime2Years(anom_hm)
 
-dTCO = ReadFile(pert_file).TCO - ReadFile(ctrl_file).TCO
-dTCO = dTCO.mean('lon')
+## Ozone
+if model.lower() == 'waccm':
+    dTCO = ReadFile(pert_file).TCO - ReadFile(ctrl_file).TCO
+    dTCO = dTCO.mean('lon')
+else:
+    dTCO = None
 
-fig,ax = PlotMass(delta.mean('lon')*1e3,dTCO,'_WACCM',fig_out = True)
-PlotMass(anom_hm,None,'_WACCM_MLS',kind='contour',colr='cyan',levels=[.25,.5,.75,1],fig=fig,ax=ax)
+fig,ax = PlotMass(delta.mean('lon')*1e3,dTCO,'_'+model.upper(),fig_out = True)
+PlotMass(anom_hm,None,'_{0}_MLS'.format(model.upper()),kind='contour',colr='cyan',levels=[.25,.5,.75,1],fig=fig,ax=ax)
 
 #delta = delta.mean('member')
 
@@ -140,7 +167,7 @@ if do_daily:
     mls = ac.CloseGlobe(mls)
     mls = mls - mls.sel(time=slice(None,'0001-01-14')).mean('time')
 
-    cjan = fc.Mass(ctrl.Q.isel(time=0).mean('member'))*1e3
+    cjan = fc.Mass(ctrl[Q].isel(time=0).mean('member'))*1e3
     inds = [14,21,28,35]
     nrows = 2
     fig,axs,transf = ac.Projection('Robinson',ncols=int(len(inds)/nrows),nrows=nrows,kw_args={'central_longitude':180})
@@ -150,7 +177,7 @@ if do_daily:
         mls.isel(time=inds[a]).plot.contour(ax=ax,levels=levs,cmap='viridis',**transf)
         ttle = ax.get_title().split(' ')[2]
         ttle = ttle.replace('0001','2022')
-        cf = (delta_d.Q-cjan).isel(time=inds[a]-inds[0]+1).plot(levels=11,vmin=0,vmax=3,extend='max',ax=ax,cmap='Blues',add_colorbar=False,**transf)
+        cf = (delta_d[Q]-cjan).isel(time=inds[a]-inds[0]+1).plot(levels=11,vmin=0,vmax=3,extend='max',ax=ax,cmap='Blues',add_colorbar=False,**transf)
         ax.set_title(ttle)
         ax.gridlines()
         ax.coastlines()
