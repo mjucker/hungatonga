@@ -11,17 +11,19 @@ import calendar
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('-m',dest='model',help='Choose model/run to plot.')
+parser.add_argument('--qbo',dest='qbo',default=None,help='Only take ensemble members which start in given QBO phase. Either + or - if given.')
+parser.add_argument('--qmodel',dest='qbo_model',default=None,help='Use this model to assess QBO phase.')
 args = parser.parse_args()
 model = args.model
 sns.set_context('paper')
 sns.set_style('whitegrid')
 colrs = sns.color_palette()
 
-fields = ['OLR','P','SLP','TS']
+fields = ['TS','P','SLP','OLR','CLDTOT']
 
 trans_fields = {'TS':'TREFHT'}
 
-scales = {'TS': 1, 'OLR': 1}
+scales = {'TS': 1, 'OLR': 1, 'CLDTOT': 1}
 
 if 'waccm' in model:
     scales['P'] = 1e3*86400
@@ -30,31 +32,40 @@ else:
     scales['P'] = 86400
     scales['SLP'] = 1
 
+default_seasons = ['DJF','MAM','JJA','SON']
 seasons = {
-    'TS': ['DJF','JJA'],
-    'OLR':['DJF','JJA'],
-    'P'  :['DJF','JJA'],
-    'SLP':[1,7],
+    'TS'    :default_seasons,
+    'OLR'   :default_seasons,
+    'P'     :default_seasons,
+    'CLDTOT':default_seasons,
+    'SLP'   :default_seasons,
+#    'SLP'   :[1,7],
 }
+nseas = 0
+for keys,seas in seasons.items():
+    nseas = max(nseas,len(seas))
 
 loncents = {
     'P' : 155,
     'OLR':155,
     'TS': 155,
+    'CLDTOT':155,
     'SLP':155,
 }
 
 avg_years = {
-    'P':   [2,8],
-    'OLR': [2,8],
-    'TS':  [2,8],
-    'SLP': [2,8],
+    'P':   [4,7],
+    'OLR': [4,7],
+    'TS':  [4,7],
+    'CLDTOT':  [4,7],
+    'SLP': [4,7],
 }
 
 vmaxs = {
     'TS': 1.5,
     'P' : 1.0,
     'SLP': 6,
+    'CLDTOT': 0.05,
     'OLR': 5.0,
     }
 
@@ -62,6 +73,8 @@ cmaps = {
     'TS': 'RdBu_r',
     'P' : 'PuOr',
     'OLR':'PiYG',
+    #'CLDTOT':'ocean',
+    'CLDTOT':'cividis',
     'SLP':'BrBG_r',
     }
 
@@ -69,33 +82,35 @@ labls = {
     'TS': 'T2m [K]',
     'P' : 'Q [mm/day]',
     'OLR':'OLR [W/m2]',
+    'CLDTOT':'CLD []',
     'SLP':'SLP [hPa]',
     }
 
-areas = {
-    'TS':{
-        'DJF': {
-            #'Scandinavia':  {'lon':slice(10,50)  ,'lat':slice(58,70)},
-            #'Eurasia': {'lon':slice(40,80)  ,'lat':slice(35,50)},
-            'NAmerica':{'lon':slice(235,265),'lat':slice(45,65)},
-            },
-        'JJA': {
-            #'Scandinavia':  {'lon':slice(20,60)  ,'lat':slice(55,70)},
-            #'NAmerica': {'lon':slice(260,290),'lat':slice(40,60)},
-            'Australia':{'lon':slice(120,145),'lat':slice(-28,-18)},
-            },
-        },
-}
+areas = fc.areas
 
 pert = xr.open_dataset('{0}_pert_ens.nc'.format(model),decode_times=False)
 ctrl = xr.open_dataset('{0}_ctrl_ens.nc'.format(model),decode_times=False)
+if args.qbo is not None:
+    if args.qbo_model is None:
+        qbo_pos,qbo_neg = fc.CheckQBO(pert,model)
+    else:
+        pertq = xr.open_dataset(args.qbo_model+'_pert_ens.nc',decode_times=False)
+        qbo_pos,qbo_neg = fc.CheckQBO(pertq,args.qbo_model)
+        qbo_pos = qbo_pos.assign_coords({'member':pert.member})
+        qbo_neg = qbo_neg.assign_coords({'member':pert.member})
+    if args.qbo == '+':
+        pert = pert.isel(member=qbo_pos)
+        ctrl = ctrl.isel(member=qbo_pos)
+    elif args.qbo == '-':
+        pert = pert.isel(member=qbo_neg)
+        ctrl = ctrl.isel(member=qbo_neg)
 
 
 dTS = pert - ctrl
 dTS,_,_ = fc.CorrectTime(dTS)
 
 nvars = len(fields)
-fig = plt.figure(figsize=[6*2,3*nvars])
+fig = plt.figure(figsize=[6*nseas,3*nvars])
 transf = {'transform':ccrs.PlateCarree()}
 
 axs = []
@@ -108,7 +123,7 @@ for f,field in enumerate(fields):
     # first, seasonal maps
     for s,season in enumerate(seasons[field]):
         p += 1
-        ax = fig.add_subplot(nvars,2,p,projection=ccrs.Robinson(central_longitude=loncents[field]))
+        ax = fig.add_subplot(nvars,nseas,p,projection=ccrs.Robinson(central_longitude=loncents[field]))
         axs.append(ax)
         if isinstance(season,int):
             filtr = da['time.month'] == season
@@ -143,17 +158,22 @@ for f,field in enumerate(fields):
         ax.set_title(field+' anomalies, {0}, years {1}-{2}'.format(seas,avg_years[field][0],avg_years[field][1]))
 ac.AddPanelLabels(axs,'upper left',ypos=1.1) 
 outFile = 'figures/{0}_maps_boxed.pdf'.format(model)
+if args.qbo is not None:
+    outFile = fc.RenameQBOFile(outFile,args.qbo)
 fig.savefig(outFile,bbox_inches='tight',transparent=True)
 print(outFile)
 
 # now add bar charts for the regions
-for field in areas.keys():
+for field in fields:
+    if field not in areas.keys():
+        continue
     var = fc.variables[model][field]
     if var in trans_fields.keys():
         var = trans_fields[var]
     da = dTS[var]*scales[field]
     fig,ax = plt.subplots()
     dt = []
+    nbars = 0
     for season in areas[field].keys():
         filtr = da['time.season'] == season
         das = da.isel(time=filtr)
@@ -163,10 +183,15 @@ for field in areas.keys():
             tmp = tmp.groupby('time.year').mean()
             tmp['region'] = labl
             dt.append(tmp)
+            nbars += 1
     dx = xr.concat(dt,'region')
     dx.name = field
     df = fc.MakeDataFrame(dx,'region')
-    sns.barplot(data=df,x='year',y=field,hue='region',ci=90,ax=ax)
+    fig.set_figwidth(4*(1+0.5*(nbars-1)))
+    try: #new versions of sns
+        sns.barplot(data=df,x='year',y=field,hue='region',errorbar=('ci',90),ax=ax)
+    except:
+        sns.barplot(data=df,x='year',y=field,hue='region',ci=90,ax=ax)
     ax.xaxis.set_minor_locator(AutoMinorLocator(2))
     ax.grid(True,axis='x',which='minor')
     sns.despine(bottom=True,left=True)
@@ -174,6 +199,8 @@ for field in areas.keys():
     ax.set_ylabel(labls[field])
     ax.set_xlabel('year')
     outFile = 'figures/{0}_bars_{1}.pdf'.format(model,field)
+    if args.qbo is not None:
+        outFile = fc.RenameQBOFile(outFile,args.qbo)
     fig.savefig(outFile,bbox_inches='tight',transparent=True)
     print(outFile)
     

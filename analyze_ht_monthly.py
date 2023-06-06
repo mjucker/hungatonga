@@ -4,18 +4,19 @@ from glob import glob
 from dask.diagnostics import ProgressBar
 import os
 
-#ctrldir = '/g/data/w40/mxj563/work/HungaTonga/mima/aqua_sponge_10yr/'
-#pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/aqua_sponge_pert_10yr/'
-#ctrldir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH/'
-#pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_pert/'
-#pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_oz/'
-#pertdir = '/scratch/w40/mxj563/mima/aqua_sponge_pert_10yr/'
+do_files = ['pert','ctrl']
+#do_files = ['pert']
 
-ctrldir = '/g/data/w40/mxj563/work/HungaTonga/mima/hthh_ctrl/'
-pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/hthh_250Tg/'
+ctrldir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_fix_ctrl/'
+#pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_fix_125Tg/'
+pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_fixq_o3init_125Tg/'
+#pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_fixo3_qinit_125Tg/'
 
-ctrldir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_ctrl/'
-pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_250Tg/'
+#ctrldir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_ctrl/'
+#pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_125Tg/'
+
+#ctrldir = '/g/data/w40/mxj563/work/HungaTonga/mima/hthh_fix_ctrl/'
+#pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/hthh_fix_125Tg/'
 
 time_period = 10
 
@@ -102,12 +103,14 @@ ens['ctrl'].attrs['source'] = ctrldir.split('/')[-2]
 # write ensemble files
 
 # full ensembles
-for key in ens.keys(): 
-         outFile = ens[key].attrs['source']+'_ens.nc'
-         if not key in outFile:
-                 outFile = outFile.replace('_ens.nc','_{0}_ens.nc'.format(key))
-         delayed = ens[key].to_netcdf(outFile,compute=False) 
-         print(outFile) 
-         with ProgressBar(): 
-             delayed.compute() 
+for key in ens.keys():
+        if key not in do_files:
+                continue
+        outFile = ens[key].attrs['source']+'_ens.nc'
+        if not key in outFile:
+                outFile = outFile.replace('_ens.nc','_{0}_ens.nc'.format(key))
+        delayed = ens[key].to_netcdf(outFile,compute=False) 
+        print(outFile) 
+        with ProgressBar(): 
+                delayed.compute() 
 

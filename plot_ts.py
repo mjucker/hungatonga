@@ -7,6 +7,8 @@ from matplotlib import pyplot as plt
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('-m',dest='model',help='Choose model/run to plot.')
+parser.add_argument('-s',dest='savefig',action="store_false",help='do NOT save the figures.')
+parser.add_argument('--qbo',dest='qbo',default=None,help='Only take ensemble members which start in given QBO phase. Either + or - if given.')
 args = parser.parse_args()
 model = args.model
 sns.set_context('paper')
@@ -16,11 +18,23 @@ colrs = sns.color_palette()
 max_year = 10
 avg_years= [4,7]
 vmax = 1.5
+#vmax = None
 
-var = 'TREFHT'#'TS'
+var = 'TS'# I am interested in land temps only here
+#var = 'P'
+#'TREFHT'#'TS'
 
 pert = xr.open_dataset('{0}_pert_ens.nc'.format(model),decode_times=False)#.TS
 ctrl = xr.open_dataset('{0}_ctrl_ens.nc'.format(model),decode_times=False)#.TS
+
+if args.qbo is not None:
+    qbo_pos,qbo_neg = fc.CheckQBO(pert,model)
+    if args.qbo == '+':
+        pert = pert.isel(member=qbo_pos)
+        ctrl = ctrl.isel(member=qbo_pos)
+    elif args.qbo == '-':
+        pert = pert.isel(member=qbo_neg)
+        ctrl = ctrl.isel(member=qbo_neg)
 
 pert = pert[fc.variables[model][var]]
 ctrl = ctrl[fc.variables[model][var]]
@@ -55,11 +69,14 @@ sns.despine(left=True,bottom=True)
 ax.set_xlabel('time [years]')
 ax.set_title('Land Ts anomalies [K]')
 outFile = 'figures/{0}_{1}_land_hemi.pdf'.format(model,var)
-fig.savefig(outFile,bbox_inches='tight',robust=True)
-print(outFile)
+if args.qbo is not None:
+    outFile = fc.RenameQBOFile(outFile,args.qbo)
+if args.savefig:
+    fig.savefig(outFile,bbox_inches='tight',robust=True)
+    print(outFile)
 
 
-select_seasons = ['DJF','JJA']
+select_seasons = ['DJF','JJA','MAM','SON']
 
 #months = {'Eurasia': 'DJF',
 #          'NAmerica':'DJF',
@@ -69,14 +86,21 @@ select_seasons = ['DJF','JJA']
 #}
 areas = {'DJF':{
                 #'Scandinavia':  {'lon':slice(10,50)  ,'lat':slice(58,70)},
-                #'Eurasia': {'lon':slice(40,80)  ,'lat':slice(35,50)},
+                'Eurasia': {'lon':slice(40,80)  ,'lat':slice(35,50)},
                 'NAmerica':{'lon':slice(235,265),'lat':slice(45,65)},
-                'Australia':{'lon':slice(120,145),'lat':slice(-28,-18)},
+                #'Australia':{'lon':slice(120,145),'lat':slice(-28,-18)},
+                'NAfrica': {'lon':slice(-10,30)  ,'lat':slice(20,35)},
                },
          'JJA':{
                 #'Scandinavia':  {'lon':slice(20,60)  ,'lat':slice(55,70)},
-                'NAmerica': {'lon':slice(260,290),'lat':slice(40,60)},
+                #'NAmerica': {'lon':slice(260,290),'lat':slice(40,60)},
                 'Australia':{'lon':slice(120,145),'lat':slice(-28,-18)},
+               },
+         'MAM':{
+                'Siberia': {'lon':slice(50,90),'lat':slice(45,65)},
+               },
+         'SON': {
+                'NAsia'  : {'lon':slice(70,120),'lat':slice(45,55)},
                },
          #'Arctic' : {'lon':slice(0,360),  'lat':slice(80,90)},
          #'EAsia':   {'lon':slice(100,125),'lat':slice(40,55)},
@@ -92,7 +116,7 @@ for select_season in select_seasons:
         dTS_MAM = dTS.isel(time=mam).sel(time=slice('{0:04d}-12'.format(avg_years[0]-1),'{0:04d}'.format(avg_years[1]))).mean('time')
     else:
         dTS_MAM = dTS.isel(time=mam).sel(time=slice('{0:04d}'.format(avg_years[0]),'{0:04d}'.format(avg_years[1]))).mean('time')
-    fig,ax,transf = ac.Projection('EqualEarth',kw_args={'central_longitude':0})
+    fig,ax,transf = ac.Projection('Robinson',kw_args={'central_longitude':155})
     fig.set_figwidth(6)
     pval = ac.StatTest(dTS_MAM,0,'T','member',parallel=True)
     dTS_MAM.mean('member').where(pval<0.1).plot(ax=ax,vmax=vmax,cbar_kwargs={'shrink':0.5},**transf)
@@ -114,8 +138,11 @@ for select_season in select_seasons:
     ax.add_geometries(geoms,edgecolor='k',facecolor='none',crs=ccrs.PlateCarree())
     ax.set_title('Ts anomalies, {0}, years {1}-{2}'.format(select_season,avg_years[0],avg_years[1]))
     outFile = 'figures/{1}_{2}_{0}.pdf'.format(select_season,model,var)
-    fig.savefig(outFile,transparent=True,bbox_inches='tight')
-    print(outFile)
+    if args.qbo is not None:
+        outFile = fc.RenameQBOFile(outFile,args.qbo)
+    if args.savefig:
+        fig.savefig(outFile,transparent=True,bbox_inches='tight')
+        print(outFile)
     #
     #
     dt = []
@@ -142,16 +169,20 @@ for select_season in select_seasons:
         tmp = tmp.isel(time=filtr).groupby('time.year').mean()
         tmp['region'] = labl
         dt.append(tmp)
-    dx = xr.concat(dt,'region')
-    dx.name = 'Ts'
-    df = fc.MakeDataFrame(dx,'region')
+    if len(dt) > 0:
+        dx = xr.concat(dt,'region')
+        dx.name = 'Ts'
+        df = fc.MakeDataFrame(dx,'region')
 
-    fig,ax = plt.subplots(figsize=[6,3])
-    sns.barplot(data=df,x='year',y='Ts',hue='region',ci=90,ax=ax)
-    sns.despine(bottom=True,left=True)
-    ax.set_title('Ts anomalies [K], {0}'.format(select_season))
-    ax.set_ylabel('Ts [K]')
-    ax.set_xlabel('time [years]')
-    outFile = 'figures/{0}_{2}_regions_{1}.pdf'.format(model,select_season,var)
-    fig.savefig(outFile,bbox_inches='tight',transparent=True)
-    print(outFile)
+        fig,ax = plt.subplots(figsize=[6,3])
+        sns.barplot(data=df,x='year',y='Ts',hue='region',errorbar=('ci',90),ax=ax)
+        sns.despine(bottom=True,left=True)
+        ax.set_title('Ts anomalies [K], {0}'.format(select_season))
+        ax.set_ylabel('Ts [K]')
+        ax.set_xlabel('time [years]')
+        outFile = 'figures/{0}_{2}_regions_{1}.pdf'.format(model,select_season,var)
+        if args.qbo is not None:
+            outFile = fc.RenameQBOFile(outFile,args.qbo)
+        if args.savefig:
+            fig.savefig(outFile,bbox_inches='tight',transparent=True)
+            print(outFile)

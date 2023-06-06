@@ -11,6 +11,8 @@ import os
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('-m',dest='model',default='waccm',help='Choose model/run to plot.')
+parser.add_argument('--qbo',dest='qbo',default=None,help='Only take ensemble members which start in given QBO phase. Either + or - if given.')
+parser.add_argument('--qmodel',dest='qbo_model',default=None,help='Use this model to assess QBO phase.')
 args = parser.parse_args()
 model = args.model
 
@@ -37,6 +39,20 @@ ctrl_file = model+'_ctrl_ens.nc'
 pert = ReadFile(pert_file)
 ctrl = ReadFile(ctrl_file)
 lev = ac.FindCoordNames(pert)['pres']
+if args.qbo is not None:
+    if args.qbo_model is None:
+        qbo_pos,qbo_neg = fc.CheckQBO(pert,model)
+    else:
+        pertq = xr.open_dataset(args.qbo_model+'_pert_ens.nc',decode_times=False)
+        qbo_pos,qbo_neg = fc.CheckQBO(pertq,args.qbo_model)
+        qbo_pos = qbo_pos.assign_coords({'member':pert.member})
+        qbo_neg = qbo_neg.assign_coords({'member':pert.member})
+    if args.qbo == '+':
+        pert = pert.isel(member=qbo_pos)
+        ctrl = ctrl.isel(member=qbo_pos)
+    elif args.qbo == '-':
+        pert = pert.isel(member=qbo_neg)
+        ctrl = ctrl.isel(member=qbo_neg)
 if model.lower() == 'waccm':
     levslice = {lev:slice(1,100)}
 else:
@@ -48,6 +64,8 @@ if not 'CLDICE' in pert.data_vars:
     ctrl['CLDICE'] = 0*ctrl[Q]
 pert = xr.merge([pert[Q],pert.CLDICE])
 ctrl = xr.merge([ctrl[Q],ctrl.CLDICE])
+
+
 
 do_daily = False
 pert_file_d = 'waccm_daily_pert_ens.nc'
@@ -117,6 +135,8 @@ def PlotMass(mass,tco=None,appendix='',levels=20,colr=None,fig_out=False,kind='a
         ttle = ttle+', TCO anomalies'
         outFile = outFile+'_dTCO'
     outFile = outFile+appendix+'.pdf'
+    if args.qbo is not None:
+        outFile = fc.RenameQBOFile(outFile,args.qbo)
     ax.set_axisbelow(False)
     fig.subplots_adjust(hspace=0.5)
     #ax = plt.gca()
@@ -155,6 +175,11 @@ if model.lower() == 'waccm':
     dTCO = dTCO.mean('lon')
 else:
     dTCO = None
+if args.qbo is not None and dTCO is not None:
+    if args.qbo == '+':
+        dTCO = dTCO.isel(member=qbo_pos)
+    elif args.qbo == '-':
+        dTCO = dTCO.isel(member=qbo_neg)
 
 fig,ax = PlotMass(delta.mean('lon')*1e3,dTCO,'_'+model.upper(),fig_out = True)
 PlotMass(anom_hm,None,'_{0}_MLS'.format(model.upper()),kind='contour',colr='cyan',levels=[.25,.5,.75,1],fig=fig,ax=ax)

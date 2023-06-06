@@ -12,6 +12,8 @@ colrs = sns.color_palette()
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('-m',dest='model',default='waccm',help='Choose model/run to plot.')
+parser.add_argument('--qbo',dest='qbo',default=None,help='Only take ensemble members which start in given QBO phase. Either + or - if given.')
+parser.add_argument('--qmodel',dest='qbo_model',default=None,help='Use this model to assess QBO phase.')
 args = parser.parse_args()
 model = args.model
 qmodel = fc.ModName(model)
@@ -24,10 +26,24 @@ same_fig = False
 pert = xr.open_dataset(model+'_pert_ens.nc',decode_times=False)#.Q
 if 'CLDICE' not in pert.data_vars:
     pert['CLDICE'] = pert[Q]*0
-pert = xr.merge([pert[Q],pert.CLDICE])
 ctrl = xr.open_dataset(model+'_ctrl_ens.nc',decode_times=False)#.Q
 if 'CLDICE' not in ctrl.data_vars:
     ctrl['CLDICE'] = pert[Q]*0
+if args.qbo is not None:
+    if args.qbo_model is None:
+        qbo_pos,qbo_neg = fc.CheckQBO(pert,model)
+    else:
+        pertq = xr.open_dataset(args.qbo_model+'_pert_ens.nc',decode_times=False)
+        qbo_pos,qbo_neg = fc.CheckQBO(pertq,args.qbo_model)
+        qbo_pos = qbo_pos.assign_coords({'member':pert.member})
+        qbo_neg = qbo_neg.assign_coords({'member':pert.member})
+    if args.qbo == '+':
+        pert = pert.isel(member=qbo_pos)
+        ctrl = ctrl.isel(member=qbo_pos)
+    elif args.qbo == '-':
+        pert = pert.isel(member=qbo_neg)
+        ctrl = ctrl.isel(member=qbo_neg)
+pert = xr.merge([pert[Q],pert.CLDICE])
 ctrl = xr.merge([ctrl[Q],ctrl.CLDICE])
 mls = fc.ReadMLS(pure_anom=True)
 mls  = mls.sel(time=slice('0001-01-01',None))
@@ -109,12 +125,18 @@ try:
     axs[0].set_xlim(tdat[0],tdat[-1])
 except:
     print('OBS: could not adjust xlims')
-fc.SaveFig(fig,'figures/{0}_tQ.pdf'.format(model))
+outFile = 'figures/{0}_tQ.pdf'.format(model)
+if args.qbo is not None:
+    outFile = fc.RenameQBOFile(outFile,args.qbo)
+fc.SaveFig(fig,outFile)
 if not same_fig:
     try:
         axs[1].set_xlim(tdat[0],tdat[-1])
     except:
         print('OBS: could not adjust xlims')
-    fc.SaveFig(fig2,'figures/{0}_tPSC.pdf'.format(model))
+    outFile = 'figures/{0}_tPSC.pdf'.format(model)
+    if args.qbo is not None:
+        outFile = fc.RenameQBOFile(outFile,args.qbo)
+    fc.SaveFig(fig2,outFile)
 
 

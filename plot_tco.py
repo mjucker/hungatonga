@@ -6,26 +6,43 @@ import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
 from hungatonga import functions as fc
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('--qbo',dest='qbo',default=None,help='Only take ensemble members which start in given QBO phase. Either + or - if given.')
+args = parser.parse_args()
+
+option = 'area' #'DU'
 
 #pert = xr.open_dataset('waccm_pert_ens.nc').TCO
 pert = xr.open_dataset('waccm_pert_ens.nc',decode_times=False)
-tmp,_,_ = fc.CorrectTime(pert)
-pert = tmp.TCO
+pert,_,_ = fc.CorrectTime(pert)
 #ctrl = xr.open_dataset('waccm_ctrl_ens.nc').TCO
 ctrl = xr.open_dataset('waccm_ctrl_ens.nc',decode_times=False)
-tmp,_,_ = fc.CorrectTime(ctrl)
-ctrl = tmp.TCO
+ctrl,_,_ = fc.CorrectTime(ctrl)
+if args.qbo is not None:
+    qbo_pos,qbo_neg = fc.CheckQBO(pert,'waccm')
+    if args.qbo == '+':
+        pert = pert.isel(member=qbo_pos)
+        ctrl = ctrl.isel(member=qbo_pos)
+    elif args.qbo == '-':
+        pert = pert.isel(member=qbo_neg)
+        ctrl = ctrl.isel(member=qbo_neg)
+pert = pert.TCO
+ctrl = ctrl.TCO
 
-#oh_pert = {'SH': ac.ComputeOzoneHoleArea(pert)*1e-12, #convert to million km2
-#           'NH': ac.ComputeOzoneHoleArea(pert,'N')*1e-12}
-#oh_ctrl = {'SH' :ac.ComputeOzoneHoleArea(ctrl)*1e-12,
-#           'NH': ac.ComputeOzoneHoleArea(ctrl,'N')*1e-12}
+oh_pert = {'SH': ac.ComputeOzoneHoleArea(pert)*1e-12, #convert to million km2
+           'NH': ac.ComputeOzoneHoleArea(pert,'N')*1e-12}
+oh_ctrl = {'SH' :ac.ComputeOzoneHoleArea(ctrl)*1e-12,
+           'NH': ac.ComputeOzoneHoleArea(ctrl,'N')*1e-12}
 
-oh_pert = {'SH': ac.GlobalAvgXr(pert.mean('lon'),[-90,-60]),
-           'NH': ac.GlobalAvgXr(pert.mean('lon'),[70,90])}
-oh_ctrl = {'SH': ac.GlobalAvgXr(ctrl.mean('lon'),[-90,-60]),
-           'NH': ac.GlobalAvgXr(ctrl.mean('lon'),[70,90])}
+#oh_pert = {'SH': ac.GlobalAvgXr(pert.mean('lon'),[-90,-60]),
+#           'NH': ac.GlobalAvgXr(pert.mean('lon'),[70,90])}
+#oh_ctrl = {'SH': ac.GlobalAvgXr(ctrl.mean('lon'),[-90,-60]),
+#           'NH': ac.GlobalAvgXr(ctrl.mean('lon'),[70,90])}
 
+ylabel = {'area':'area [million km2]',
+          'DU'  :'TCO [DU]'
+          }
 
 
 # plot anomalies only
@@ -60,11 +77,19 @@ yr1 = years[0]
 years = [y-yr1+1 for y in years]
 dg = pd.DataFrame(data={'hemi':hemi,'member':memb,'year':years,'TCO':vals})
 with sns.axes_style('whitegrid'):
+    try: # new sns versions
+        sns.barplot(data=dg,x='year',y='TCO',hue='hemi',errorbar=('ci',90),ax=ax)
+    except: # old sns vesions
         sns.barplot(data=dg,x='year',y='TCO',hue='hemi',ci=90,ax=ax)
-        sns.despine(bottom=True)
-ax.set_title('Polar cap mean TCO anomaly [DU]')
-ax.set_ylabel('TCO anomaly [DU]')
+    sns.despine(bottom=True)
+if option == 'area':
+    ax.set_title('Ozone hole area [million km2]')
+elif option == 'DU':
+    ax.set_title('Polar cap mean TCO anomaly [DU]')
+ax.set_ylabel(ylabel[option])
 outFile = 'figures/tco_anomaly.pdf'
+if args.qbo is not None:
+    outFile = fc.RenameQBOFile(outFile,args.qbo)
 fig.savefig(outFile,transparent=True,bbox_inches='tight')
 print(outFile)
 
@@ -118,5 +143,7 @@ for hemi,sel in hemis.items():
     ax.set_xticks(ctrl_min.month.values)
     ax.set_xlim(ctrl_min.month.min().values,ctrl_min.month.max().values)
     outFile = 'figures/polar_cap_tco_{0}.pdf'.format(hemi)
+    if args.qbo is not None:
+        outFile = fc.RenameQBOFile(outFile,args.qbo)
     fig.savefig(outFile,bbox_inches='tight',transparent=True)
     print(outFile)

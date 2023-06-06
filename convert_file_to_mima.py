@@ -1,5 +1,6 @@
 import xarray as xr
 import numpy as np
+from aostools import climate as ac
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('-f',dest='filename')
@@ -45,6 +46,8 @@ enc = {'time':{'calendar':'360_day','dtype':ttype},
        'pfull':{'dtype':ftype},
        }
 
+# close longitudinally before interpolating to avoid extrapolation
+dsm = ac.CloseGlobe(dsm)
 do = dsm.interp({'lon':lon,'lat':lat}).to_dataset()
 do.lon.attrs = dsm.lon.attrs
 do.lon.attrs['edges'] = 'lonb'
@@ -61,4 +64,7 @@ outFile = var+'.nc'
 do.to_netcdf(outFile,encoding=enc)
 print(outFile)
 print('OBS: YOU WILL PROBABLY WANT TO CHANGE THE CALENDAR FROM 360_DAY TO 360 LIKE SO:')
-print("ncatted -a calendar,{0},o,c,360 {1}".format(var,outFile)
+print("ncatted -a calendar,time,o,c,360 {0}".format(outFile))
+print('OBS: IF THIS IS A CONCENTRATION IN MOL/MOL, YOU WILL ALSO NEED TO CONVERT TO KG/KG. FOR O3, THIS IS DONE LIKE SO:')
+print("ncap2 -s '{0}={0}*48.0/29.0' {1} -O {1}".format(var,outFile))
+print("ncatted -a units,{0},o,c,kg/kg {1}".format(var,outFile))

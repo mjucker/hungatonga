@@ -53,7 +53,7 @@ def CorrectTime(ds,decode=True):
             correctyear = 0
         else:
             correctyear = 1
-        units = units.replace('{:04d}'.format(30),'{:04d}'.format(correctyear))
+        units = units.replace('{:04d}'.format(startyear),'{:04d}'.format(correctyear))
         ds.time.attrs['units'] = units
         return xr.decode_cf(ds),units,calendar
     else:
@@ -138,7 +138,7 @@ def ConvertTime2Years(ds):
 
 def ReadMLS(pure_anom=False):
     mls  = xr.open_dataset('MLS_data.nc')
-    mls = mls.assign_coords({'TS_Time':mls.ts_Time,'ZM_Lat':mls.zm_lat})
+    #mls = mls.assign_coords({'TS_Time':mls.ts_Time,'ZM_Lat':mls.zm_lat})
     mls = mls.rename({'TS_Time':'time','ZM_Lat':'lat'})
     # align real eruption (max around Jan 25) with WACCM sims (Jan 1)
     mls.time.attrs['units'] = 'days since 0000-10-05'
@@ -175,9 +175,9 @@ def ReadMLSMap():
     return mls.map_data
 
 
-variables = {'waccm': {'T':'T','U':'U','SLP':'PSL','O3':'O3','TS':'TS','TREFHT':'TREFHT','Q':'Q','P':'PREC','TCWV':'TMQ','TCO':'TCO','OLR':'FLNT','OMEGA':'OMEGA','TH':'TH','VTH3d':'VTH3d'},
+variables = {'waccm': {'T':'T','U':'U','SLP':'PSL','O3':'O3','TS':'TREFHT','TREFHT':'TREFHT','Q':'Q','P':'PREC','TCWV':'TMQ','TCO':'TCO','OLR':'FLNT','OMEGA':'OMEGA','TH':'TH','VTH3d':'VTH3d','CLDTOT':'CLDTOT'},
              'mima' : {'T':'temp','U':'ucomp','SLP':'slp','TS':'t_surf','Q':'sphum','P':'precip','OLR':'olr','TCWV':'tcwv'}}
-for mod in ['aqua','aqua_sponge','aqua_sponge_10yr','bench_SH','hthh','hthh']:
+for mod in ['aqua','aqua_sponge','aqua_sponge_10yr','bench_SH','bench_SH_fix','hthh','hthh_fix']:
     variables[mod] = variables['mima']
 
 
@@ -231,3 +231,68 @@ def AddBox(ax,region,colr):
                                     miny=region['lat'].start,maxy=region['lat'].stop)
     #geoms.append(geom)
     ax.add_geometries([geom],edgecolor=colr,facecolor='none',crs=ccrs.PlateCarree(),zorder=5)
+
+def CheckQBO(ens_file,model):
+    from aostools import climate as ac
+    U = variables[model]['U']
+    if isinstance(ens_file,str):
+        ds = xr.open_dataset(ens_file)[U]
+    else:
+        ds = ens_file[U]
+    lev= ac.FindCoordNames(ds)['pres']
+    U50 = ds.sel({lev:50,'lat':slice(-5,5)}).isel(time=0).mean(['lon','lat'])
+    del U50['time']
+    del U50[lev]
+    qbo_pos = U50 > 0
+    qbo_neg = U50 < 0
+    return qbo_pos,qbo_neg
+
+def RenameQBOFile(filename,qbo,ftype='.pdf'):
+    qnme = {'+':'p','-':'m'}
+    return filename.replace(ftype,'_QBO{0}{1}'.format(qnme[qbo],ftype))
+
+
+areas = {}
+areas['P']  = {'DJF':{
+                'ITCZ':{'lon':slice(180.1,210), 'lat': slice(5,10)},
+                'MC'  :{'lon':slice(120,140),   'lat': slice(0,20)},
+                },
+               'JJA':{
+                #'ITCZ':{'lon':slice(180,210), 'lat': slice(5,10)},
+                #'MC'  :{'lon':slice(120,140),   'lat': slice(0,20)},
+                'ION':  {'lon':slice(65,95),     'lat': slice(10,20)},
+                'IOS':  {'lon':slice(40,100),     'lat': slice(-10,-2)},
+                },
+               'MAM':{
+                'ITCZS':{'lon':slice(180.1,210), 'lat': slice(-15,-10)},
+                'SPCZN':{'lon':slice(145,165), 'lat': slice(-15,-10)},
+                },
+               'SON':{
+                'ITCZ':{'lon':slice(180.1,200), 'lat': slice(10,15)},
+                #'MC'  :{'lon':slice(120,140),   'lat': slice(0,20)},
+                },
+               }
+areas['TS'] = {'DJF':{
+                #'Scandinavia':  {'lon':slice(10,50)  ,'lat':slice(58,70)},
+                'Eurasia': {'lon':slice(40,80)  ,'lat':slice(35,50)},
+                'NAmerica':{'lon':slice(235,265),'lat':slice(45,65)},
+                #'Australia':{'lon':slice(120,145),'lat':slice(-28,-18)},
+                'NAfrica': {'lon':slice(-10,30)  ,'lat':slice(20,35)},
+               },
+         'JJA':{
+                #'Scandinavia':  {'lon':slice(20,60)  ,'lat':slice(55,70)},
+                #'NAmerica': {'lon':slice(260,290),'lat':slice(40,60)},
+                'Australia':{'lon':slice(120,145),'lat':slice(-28,-18)},
+               },
+         'MAM':{
+                'Siberia': {'lon':slice(50,90),'lat':slice(45,65)},
+               },
+         'SON': {
+                'NAsia'  : {'lon':slice(70,120),'lat':slice(45,55)},
+               },
+         #'Arctic' : {'lon':slice(0,360),  'lat':slice(80,90)},
+         #'EAsia':   {'lon':slice(100,125),'lat':slice(40,55)},
+         #'Australia':{'lon':slice(115,155),'lat':slice(-38,-20)}
+         }
+areas['CLDTOT'] = areas['TS']
+areas['OLR']    = areas['TS'] 
