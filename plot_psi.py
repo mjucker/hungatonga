@@ -8,6 +8,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-m',dest='model',default='waccm',help='Choose model/run to plot.')
 parser.add_argument('--qbo',dest='qbo',default=None,help='Only take ensemble members which start in given QBO phase. Either + or - if given.')
 parser.add_argument('-y',dest='years',default=None,help='average of this range of years. form startYear,stopYear')
+parser.add_argument('-v',dest='variable',default='psi',help='which variable to show in background shading.')
 args = parser.parse_args()
 model = args.model
 qmodel = fc.ModName(model)
@@ -18,7 +19,12 @@ colrs = sns.color_palette()
 levels = [l for l in np.linspace(-1e10,1e10,21) if l !=0]
 
 sTS = xr.open_dataset('{0}_psis_season_delta_ens.nc'.format(model),decode_times=False).isel(time=slice(1,None))
-sCT = xr.open_dataset('{0}_psis_season_ctrl_ens.nc'.format(model),decode_times=False).isel(time=slice(1,None))
+if args.variable == 'psi' or args.variable == 'psis':
+    sCT = xr.open_dataset('{0}_psis_season_ctrl_ens.nc'.format(model),decode_times=False).isel(time=slice(1,None))
+    do_test = False
+else:
+    sCT = sTS.copy()
+    do_test = True
 sTS,_,_ = fc.CorrectTime(sTS)
 sCT,_,_ = fc.CorrectTime(sCT)
 if args.qbo is not None:
@@ -46,14 +52,24 @@ else:
 ncols = 4
 
 pval = ac.StatTest(sTS.psi,0,'T','member',parallel=True)
+pfiltr = pval < 0.1
+#pval = ac.StatTest(sTS.psi,psic,'sign','member',parallel=True)
+#pfiltr = pval > 0.66
 psid = sTS.psi.mean('member')
-psic = sCT.psi.mean('member')
 
+psic = sCT[args.variable]
+if 'lon' in psic.dims:
+    psic = psic.mean('lon')
+if do_test:
+    pval = ac.StatTest(psic,0,'T','member',parallel=True)
+    psic = psic.mean('member').where(pval < 0.1)
+else:
+    psic = psic.mean('member')
 
 fp = psic.sel(lev=slice(100,None)).plot.contourf(x='lat',yincrease=False,col=coldim,col_wrap=ncols,levels=20)
 for a,ax in enumerate(fp.axs.flat):
     psid.isel({coldim:a}).sel(lev=slice(100,None)).plot.contour(levels=levels,x='lat',yincrease=False,ax=ax,colors='k',linewidths=0.5)
-    psid.where(pval<0.1).isel({coldim:a}).sel(lev=slice(100,None)).plot.contour(levels=levels,x='lat',yincrease=False,ax=ax,colors='k',linewidths=2)
+    psid.where(pfiltr).isel({coldim:a}).sel(lev=slice(100,None)).plot.contour(levels=levels,x='lat',yincrease=False,ax=ax,colors='k',linewidths=2)
     if args.years is None:
         yr = psid.isel({coldim:a}).time.dt.year.values
         ss = psid.isel({coldim:a}).time.dt.season.values
@@ -66,7 +82,7 @@ for a,ax in enumerate(fp.axs.flat):
     if not ax.get_subplotspec().is_first_col():
         ax.set_ylabel('')
 
-outFile = 'figures/{0}_psi_season_year.pdf'.format(model)
+outFile = 'figures/{0}_{1}_psi_season_year.pdf'.format(model,args.variable)
 if args.years is not None:
     outFile = outFile.replace('_year.pdf','_years{0}-{1}.pdf'.format(*years))
 if args.qbo is not None:

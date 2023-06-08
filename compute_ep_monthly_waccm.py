@@ -19,7 +19,7 @@ keep_vars = ['UV3d','VTH3d','UW3d','TH','U','T']
 
 ctrlfile = '/g/data/w40/mxj563/work/HungaTonga/waccm/F2000/F2000_HungaTunga_control_monthly-06to44yr.interp.nc'
 #ctrlfile = '/scratch/w40/mxj563/sh_met_book/F2000_HungaTonga_control_monthly-06to44yr.interp.nc'
-pertdir  = '/g/data/w40/mxj563/work/HungaTonga/waccm/F2000/ensemble/'
+pertdir  = '/g/data/w40/mxj563/work/HungaTonga/waccm/F2000/100Tg/ensemble/'
 #pertdir  = '/g/data/w40/mxj563/work/HungaTonga/waccm/F2000/ensemble/high_top/'
 #pertdir = '/scratch/w40/mxj563/hungatonga/tmp/'
 member_length = 10
@@ -61,7 +61,7 @@ files.sort()
 tmp = xr.open_dataset(files[0],decode_times=False)
 zero_time = DecodeDs(tmp).time
 
-pert = xr.open_mfdataset(files,preprocess=AddMember,concat_dim='member')
+pert = xr.open_mfdataset(files,preprocess=AddMember,combine='nested',concat_dim='member')
 pert = CleanVars(pert)
 # restrict to member_length
 pert = pert.isel(time=slice(None,12*member_length))
@@ -81,24 +81,30 @@ for member in pert.member:
         print('CANNOT ADD MEMBER {0} AS TIME DIMENSION NOT SAME LENGTH: {1} ON CTRL, {2} ON PERT'.format(member.values,len(ctrl_tmp.time),len(pert.sel(member=member).time)))
 ens['ctrl'] = xr.concat(ctrl_ens,'member')
 
+limits = {'TH' : 250,
+          }
 
 # compute EP fluxes
 #  this code is borrowed from aostools
 ep_comp  = {}
 for key in ens.keys():
     if 'VTH3d' in ens[key].data_vars:
-        vpThp = ens[key]['VTH3d'].mean('lon')
+        vpThp = ens[key]['VTH3d']
     else:
         factr = (1e3/ens[key].lev)**at.kappa
-        vpThp = ens[key]['VT'].mean('lon')*factr
+        vpThp = ens[key]['VT']*factr
     filtr = vpThp<1e15
-    vpThp = vpThp.where(filtr,0) #[m.K/s]
+    vpThp = vpThp.where(filtr).mean('lon') #[m.K/s]
     if 'TH' in ens[key].data_vars:
-        theta = ens[key]['TH'].mean(['member','lon'])
+        theta = ens[key]['TH']
     else:
-        theta = ens[key]['T'].mean(['member','lon'])*factr
-    theta = theta.where(filtr,250) # [K]
+        theta = ens[key]['T']*factr
+    theta = theta.where(filtr).where(theta>limits['TH']).mean(['member','lon'])
     dTheta_dp = theta.differentiate('lev') # [K/hPa]
+    dTheta_dp = dTheta_dp.rolling(lat=5,center=True,min_periods=5).mean()
+    dTheta_dp = dTheta_dp.rolling(lev=3,center=True,min_periods=3).mean()
+    #theta = theta.where(filtr,250) # [K]
+    #dTheta_dp = dTheta_dp.where(filtr,0)
     #
     ubar = ens[key]['U'].mean('lon')
     fhat = np.deg2rad((ubar*at.coslat(ubar.lat)).differentiate('lat'))
@@ -107,27 +113,29 @@ for key in ens.keys():
     #
     shear = ubar.differentiate('lev') # [m/s/hPa]
     #
-    upvp = ens[key]['UV3d'].mean('lon')
-    upvp = upvp.where(filtr,0) # [m2/s2]
+    upvp = ens[key]['UV3d'].where(filtr).mean('lon')
+    #upvp = upvp.where(filtr,0) # [m2/s2]
     #
     ep1 = -upvp + shear*vpThp/dTheta_dp 
     ep1.name = 'ep1'
     ep1.attrs['units'] = 'm2/s2'
     #
-    uw = ens[key]['UW3d'].mean('lon') # [m2/s2]
-    uw = -uw.lev*at.g/at.Rd*uw/ens[key]['T'].mean('lon') # omega = - p.g/Rd*w/T
-    uw = uw.where(filtr,0) # [m.hPa/s2]
+    uw = ens[key]['UW3d'].where(filtr).mean('lon') # [m2/s2]
+    uw = -uw.lev*at.g/at.Rd*uw/ens[key]['T'].where(filtr).mean('lon') # omega = - p.g/Rd*w/T
+    #uw = uw.where(filtr,0) # [m.hPa/s2]
     #
     ep2 = fhat*vpThp/dTheta_dp - uw
     ep2.name = 'ep2'
     ep2.attrs['units'] = 'hPa.m/s2'
     ep_comp[key] = xr.merge([ep1,ep2])
     #
+    ep1 = ep1.chunk(lat=len(ep1.lat))
     div1 = at.coslat(ep1.lat)*np.deg2rad(ep1.differentiate('lat')) - 2*at.sinlat(ep1.lat)*ep1
     div1 = div1/at.a0/at.coslat(ep1.lat)*86400
     div1.name = 'div1'
     div1.attrs['units'] = 'm/s/day'
     #
+    ep2 = ep2.chunk(lev=len(ep2.lev))
     div2 = ep2.differentiate('lev')*86400
     div2.name = 'div2'
     div2.attrs['units'] = 'm/s/day'
