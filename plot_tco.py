@@ -10,6 +10,8 @@ import calendar
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--qbo',dest='qbo',default=None,help='Only take ensemble members which start in given QBO phase. Either + or - if given.')
+parser.add_argument('--years',dest='years',default=None,help='Only show this range of years.')
+parser.add_argument('--ylim',dest='ylim',default=None,nargs=2,help='Fix y limits of plot.')
 args = parser.parse_args()
 
 option = 'area' #'DU','area'
@@ -20,12 +22,22 @@ operation = 'mean' #'mean','extr'
 
 do_spaghetti = False
 
+if args.years is not None:
+    years = [int(y) for y in args.years.split(',')]
+    yslice = {'time':slice('{:04d}'.format(years[0]),'{:04d}'.format(years[1]))}
+if args.ylim is not None:
+    ylims = [float(y) for y in args.ylim]
+
 #pert = xr.open_dataset('waccm_pert_ens.nc').TCO
 pert = xr.open_dataset('waccm_pert_ens.nc',decode_times=False)
 pert,_,_ = fc.CorrectTime(pert)
+if args.years is not None:
+    pert = pert.sel(yslice)
 #ctrl = xr.open_dataset('waccm_ctrl_ens.nc').TCO
 ctrl = xr.open_dataset('waccm_ctrl_ens.nc',decode_times=False)
 ctrl,_,_ = fc.CorrectTime(ctrl)
+if args.years is not None:
+    ctrl = ctrl.sel(yslice)
 if args.qbo is not None:
     qbo_pos,qbo_neg = fc.CheckQBO(pert,'waccm')
     if args.qbo == '+':
@@ -120,6 +132,8 @@ if option == 'area':
 elif option == 'DU':
     ax.set_title(op_name+' polar cap TCO anomaly [DU]')
 ax.set_ylabel(ylabel[option])
+if args.ylim is not None:
+    ax.set_ylim(*ylims)
 outFile = 'figures/tco_anomaly_{0}.pdf'.format(option)
 if args.qbo is not None:
     outFile = fc.RenameQBOFile(outFile,args.qbo)

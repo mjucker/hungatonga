@@ -27,7 +27,7 @@ cutoff_year = 3
 vlevels = {
     'O3'  : [l for l in np.linspace(-1e-7,1e-7,21) if l !=0],
     'Q'   : [l for l in np.linspace(-1e-6,1e-6,21) if l !=0],
-    'psis': [l for l in np.linspace(-1e11,1e11,21) if l !=0],
+    'psis': [l for l in np.linspace(-1e9 ,1e9 ,21) if l !=0],
     'psi' : [l for l in np.linspace(-1e10,1e10,21) if l !=0],
     }
 
@@ -67,7 +67,8 @@ dtmp = delta.sel({lev:levs})
 fg = dtmp[args.var1].where(dtmp['pval_'+args.var1]<0.1).plot(col='time',col_wrap=4,yincrease=False,yscale='log',zorder=0)
 dpsis = dtmp[args.var2].where(dtmp['pval_'+args.var2]<0.1)
 for a,ax in enumerate(fg.axs.flat):
-    dpsis.isel(time=a).plot.contour(levels=vlevels[args.var2],colors='k',ax=ax,x='lat',yincrease=False,yscale='log',zorder=2)
+    dtmp[args.var2].isel(time=a).plot.contour(levels=vlevels[args.var2],ax=ax,x='lat',yincrease=False,yscale='log',zorder=2,linewidths=0.5,colors='gray')
+    dpsis.isel(time=a).plot.contour(levels=vlevels[args.var2],colors='k',ax=ax,x='lat',yincrease=False,yscale='log',zorder=3,linewidths=2)
     t = dpsis.isel(time=a).time
     yr = int(t.dt.year.values)
     seas=t.dt.season.values

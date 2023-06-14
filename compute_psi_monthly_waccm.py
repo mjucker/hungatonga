@@ -20,7 +20,7 @@ keep_vars = ['V','VTH3d','TH','OMEGA']
 #member_length = 5
 
 ctrlfile = '/g/data/w40/mxj563/work/HungaTonga/waccm/F2000/F2000_HungaTunga_control_monthly-06to44yr.interp.nc'
-pertdir  = '/g/data/w40/mxj563/work/HungaTonga/waccm/F2000/ensemble/'
+pertdir  = '/g/data/w40/mxj563/work/HungaTonga/waccm/F2000/100Tg/ensemble/'
 #pertdir = '/scratch/w40/mxj563/hungatonga/tmp/'
 member_length = 10
 #ctrlfile = '/g/data/w40/mxj563/work/HungaTonga/waccm/PI/HungaTungaPI_monthly-06to36.interp.nc'
@@ -61,7 +61,7 @@ files.sort()
 tmp = xr.open_dataset(files[0],decode_times=False)
 zero_time = DecodeDs(tmp).time
 
-pert = xr.open_mfdataset(files,preprocess=AddMember,concat_dim='member')
+pert = xr.open_mfdataset(files,preprocess=AddMember,combine='nested',concat_dim='member')
 pert = CleanVars(pert)
 # restrict to member_length
 pert = pert.isel(time=slice(None,12*member_length))
@@ -82,24 +82,32 @@ for member in pert.member:
 ens['ctrl'] = xr.concat(ctrl_ens,'member')
 
 
+limits = {'TH' : 250,
+          }
+
 # compute psi
 #  this code is borrowed from aostools
 psi_comp  = {}
 psis_comp = {}
 for key in ens.keys():
     if 'VTH3d' in ens[key].data_vars:
-        vpThp = ens[key]['VTH3d'].mean('lon')
+        vpThp = ens[key]['VTH3d']
     else:
         factr = (1e3/ens[key].lev)**at.kappa
-        vpThp = ens[key]['VT'].mean('lon')*factr
+        vpThp = ens[key]['VT']*factr
+    filtr = vpThp<1e15
+    vpThp = vpThp.where(filtr).mean('lon') #[m.K/s]
     if 'TH' in ens[key].data_vars:
-        theta = ens[key]['TH'].mean(['member','lon'])
+        theta = ens[key]['TH']
     else:
-        theta = ens[key]['T'].mean(['member','lon'])*factr
-    dTheta_dp = theta.differentiate('lev')*0.01
-    vbar = ens[key]['V'].mean('lon')
+        theta = ens[key]['T']*factr
+    theta = theta.where(filtr).where(theta>limits['TH']).mean(['member','lon'])
+    dTheta_dp = theta.differentiate('lev') # [K/hPa]
+    dTheta_dp = dTheta_dp.rolling(lat=5,center=True,min_periods=5).mean()
+    dTheta_dp = dTheta_dp.rolling(lev=3,center=True,min_periods=3).mean()
+    vbar = ens[key]['V'].where(filtr).mean('lon')
     pdim = vbar.get_axis_num('lev')
-    psi = vbar.reduce(cumtrapz,x=vbar['lev'],axis=pdim,initial=0)
+    psi = vbar.reduce(cumtrapz,x=vbar['lev'],axis=pdim,initial=0) # [m.hPa/s]
     psis= psi - vpThp/dTheta_dp
     psi = 2*np.pi*at.a0/at.g*psi *at.coslat(ens[key]['lat'])*100
     psis= 2*np.pi*at.a0/at.g*psis*at.coslat(ens[key]['lat'])*100
