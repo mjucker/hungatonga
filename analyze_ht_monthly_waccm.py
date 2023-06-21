@@ -9,7 +9,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-c',dest='case',default='100Tg')
 args = parser.parse_args()
 
-keep_vars = ['O3','U','V','T','TS','TREFHT','Q','PSL','PRECC','PRECL','PRECSC','PRECSL','Z3','TCO','OMEGA','FLNT','CLDICE','U10','V10','CLDTOT']
+keep_vars = ['O3','U','V','T','TS','TREFHT','Q','PSL','PRECC','PRECL','PRECSC','PRECSL','Z3','TCO','OMEGA','FLNT','CLDICE','U10','V10','CLDTOT','FLDS','CLDHGH','CLDMED','CLDLOW','LWCF','SWCF']
 
 sum_vars = {'PREC':['PRECC','PRECL','PRECSC','PRECSL']}
 

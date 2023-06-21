@@ -128,12 +128,19 @@ with sns.axes_style('whitegrid'):
         sns.barplot(data=dg,x='year',y='TCO',hue='hemi',ci=90,ax=ax)
     sns.despine(bottom=True)
 if option == 'area':
-    ax.set_title(op_name+' ozone hole area [million km2]')
+    ttle = op_name+' ozone hole area [million km2]'
 elif option == 'DU':
-    ax.set_title(op_name+' polar cap TCO anomaly [DU]')
+    ttle = op_name+' polar cap TCO anomaly [DU]'
+if args.qbo is not None:
+    if args.qbo == '+':
+        ttle = ttle+', QBOW'
+    elif args.qbo == '-':
+        ttle = ttle+', QBOE'
+ax.set_title(ttle)
 ax.set_ylabel(ylabel[option])
 if args.ylim is not None:
     ax.set_ylim(*ylims)
+ax.set_xlabel('time [years since eruption]')
 outFile = 'figures/tco_anomaly_{0}.pdf'.format(option)
 if args.qbo is not None:
     outFile = fc.RenameQBOFile(outFile,args.qbo)

@@ -46,10 +46,12 @@ def CorrectTime(ds,decode=True):
     else:
         daysperyear = 360
         mid_month   = 0
-    if ds.time[0] == 0:
+    if ds.time[0] <= 0:
         startyear = int(units.split('since ')[-1].split('-')[0])
         startmonth= int(units.split('-')[1].split('-')[0])
         if startmonth == 12: #start with DJF
+            ds = ds.assign_coords({'time':ds.time+31})
+            ds.time.attrs['calendar'] = calendar
             correctyear = 0
         else:
             correctyear = 1
@@ -175,15 +177,19 @@ def ReadMLSMap():
     return mls.map_data
 
 
-variables = {'waccm': {'T':'T','U':'U','SLP':'PSL','O3':'O3','TS':'TREFHT','TREFHT':'TREFHT','Q':'Q','P':'PREC','TCWV':'TMQ','TCO':'TCO','OLR':'FLNT','OMEGA':'OMEGA','TH':'TH','VTH3d':'VTH3d','CLDTOT':'CLDTOT'},
-             'mima' : {'T':'temp','U':'ucomp','SLP':'slp','TS':'t_surf','Q':'sphum','P':'precip','OLR':'olr','TCWV':'tcwv'}}
-for mod in ['aqua','aqua_sponge','aqua_sponge_10yr','bench_SH','bench_SH_fix','hthh','hthh_fix']:
+variables = {'waccm': {'T':'T','U':'U','SLP':'PSL','O3':'O3','TS':'TREFHT','TREFHT':'TREFHT','Q':'Q','P':'PREC','TCWV':'TMQ','TCO':'TCO','OLR':'FLNT','DLS':'FLDS','OMEGA':'OMEGA','TH':'TH','VTH3d':'VTH3d','CLDTOT':'CLDTOT','CLDLOW':'CLDLOW','CLDHGH':'CLDHGH','CLDMED':'CLDMED','LWCF':'LWCF','SWCF':'SWCF'},
+             'mima' : {'T':'temp','U':'ucomp','V':'vcomp','SLP':'slp','TS':'t_surf','Q':'sphum','P':'precip','OLR':'olr','TCWV':'tcwv'}}
+for mod in ['aqua','aqua_sponge','hthh','hthh_fix','bench_SH']:
     variables[mod] = variables['mima']
 
 
 def ModName(model):
     if '_' in model:
-        qmodel = '_'.join(model.split('_')[:-1])
+        splitname = model.split('_')
+        if len(splitname) > 2:
+            qmodel = '_'.join(splitname[:2])
+        else:
+            qmodel = '_'.join(splitname[:-1])
     else:
         qmodel = model
     return qmodel
@@ -256,6 +262,7 @@ areas = {}
 areas['P']  = {'DJF':{
                 'ITCZ':{'lon':slice(180.1,210), 'lat': slice(5,10)},
                 'MC'  :{'lon':slice(120,140),   'lat': slice(0,20)},
+                'Europe':{'lon':slice(0.1,30),   'lat': slice(45,53)},
                 },
                'JJA':{
                 #'ITCZ':{'lon':slice(180,210), 'lat': slice(5,10)},
@@ -273,7 +280,7 @@ areas['P']  = {'DJF':{
                 },
                }
 areas['TS'] = {'DJF':{
-                #'Scandinavia':  {'lon':slice(10,50)  ,'lat':slice(58,70)},
+                'Scandinavia':  {'lon':slice(10,40)  ,'lat':slice(58,70)},
                 'Eurasia': {'lon':slice(40,80)  ,'lat':slice(35,50)},
                 'NAmerica':{'lon':slice(235,265),'lat':slice(45,65)},
                 #'Australia':{'lon':slice(120,145),'lat':slice(-28,-18)},
@@ -283,16 +290,18 @@ areas['TS'] = {'DJF':{
                 #'Scandinavia':  {'lon':slice(20,60)  ,'lat':slice(55,70)},
                 #'NAmerica': {'lon':slice(260,290),'lat':slice(40,60)},
                 'Australia':{'lon':slice(120,145),'lat':slice(-28,-18)},
+                'Arctic':{'lon':slice(40,270),'lat':slice(75,90)},
                },
          'MAM':{
                 'Siberia': {'lon':slice(50,90),'lat':slice(45,65)},
                },
          'SON': {
                 'NAsia'  : {'lon':slice(70,120),'lat':slice(45,55)},
+                'Arctic':{'lon':slice(40,270),'lat':slice(75,90)},
                },
          #'Arctic' : {'lon':slice(0,360),  'lat':slice(80,90)},
          #'EAsia':   {'lon':slice(100,125),'lat':slice(40,55)},
          #'Australia':{'lon':slice(115,155),'lat':slice(-38,-20)}
          }
-areas['CLDTOT'] = areas['TS']
-areas['OLR']    = areas['TS'] 
+for var in ['CLDTOT','DLS','OLR','LWCF','SWCF']:
+    areas[var] = areas['TS']
