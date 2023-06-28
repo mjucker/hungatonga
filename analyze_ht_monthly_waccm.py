@@ -9,9 +9,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-c',dest='case',default='100Tg')
 args = parser.parse_args()
 
-keep_vars = ['O3','U','V','T','TS','TREFHT','Q','PSL','PRECC','PRECL','PRECSC','PRECSL','Z3','TCO','OMEGA','FLNT','CLDICE','U10','V10','CLDTOT','FLDS','CLDHGH','CLDMED','CLDLOW','LWCF','SWCF']
+keep_vars = ['O3','U','V','T','TS','TREFHT','Q','PSL','PRECC','PRECL','PRECSC','PRECSL','Z3','TCO','OMEGA','FLNT','CLDICE','U10','V10','CLDTOT','FLDS','CLDHGH','CLDMED','CLDLOW','LWCF','SWCF','ICEFRAC']
+#keep_vars = ['ICEFRAC']
 
 sum_vars = {'PREC':['PRECC','PRECL','PRECSC','PRECSL']}
+#sum_vars = {}
 
 do_not_compress = ['Q','CLDICE']
 
@@ -75,9 +77,9 @@ def DecodeDs(ds):
 ctrl = xr.open_dataset(ctrlfile,decode_times=False)
 ctrl = CleanVars(ctrl)
 ctrl = DecodeDs(ctrl)
-
 # add TCO
-ctrl['TCO'] = ac.TotalColumnOzone(ctrl['O3'],ctrl['T'])
+if 'O3' in ctrl.data_vars:
+    ctrl['TCO'] = ac.TotalColumnOzone(ctrl['O3'],ctrl['T'])
 
 files = glob(pertdir+'*.nc')
 files.sort()
@@ -90,7 +92,8 @@ pert = CleanVars(pert)
 # restrict to member_length
 pert = pert.isel(time=slice(None,12*member_length))
 # add TCO
-pert['TCO'] = ac.TotalColumnOzone(pert['O3'],pert['T'])
+if 'O3' in pert.data_vars:
+    pert['TCO'] = ac.TotalColumnOzone(pert['O3'],pert['T'])
 
 if 'TCO' not in keep_vars:
     keep_vars.append('TCO')

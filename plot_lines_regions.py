@@ -15,7 +15,7 @@ parser.add_argument('-m',dest='model',help='Choose model/run to plot.')
 parser.add_argument('-v',dest='vars',default=None,nargs='+')
 args = parser.parse_args()
 model = args.model
-sns.set_context('paper')
+sns.set_context('notebook')
 sns.set_style('whitegrid')
 colrs = sns.color_palette()
 
@@ -30,11 +30,11 @@ var_fields = {'TS':'TREFHT'}
 
 areas = {
     'TS':{
-        
-        'Scandinavia':  {'lon':slice(10,50)  ,'lat':slice(58,70)},
-        'Eurasia': {'lon':slice(40,80)  ,'lat':slice(35,50)},
-        'NAmerica':{'lon':slice(235,265),'lat':slice(45,65)},
-        'Australia':{'lon':slice(120,145),'lat':slice(-28,-18)},
+         
+        'Scandinavia':  fc.areas['TS']['DJF']['Scandinavia'],#{'lon':slice(10,50)  ,'lat':slice(58,70)},
+        'Eurasia': fc.areas['TS']['DJF']['Eurasia'],#{'lon':slice(40,80)  ,'lat':slice(35,50)},
+        'NAmerica':fc.areas['TS']['DJF']['NAmerica'],
+        'Australia':fc.areas['TS']['JJA']['Australia'],#{'lon':slice(120,145),'lat':slice(-28,-18)},
     },
     'SLP':{
         'ASL':  {'lon':slice(235,275)  ,'lat':slice(-70,-60)},
@@ -97,7 +97,7 @@ dTS,_,_ = fc.CorrectTime(dTS)
 
 # analyze monthly timeseries
 for s,roll in enumerate(rolls):
-    for f,field in enumerate(areas.keys()):
+    for f,field in enumerate(fields):
         axs = []
         nreg = len(areas[field].keys())
         ncols = 2
@@ -136,7 +136,7 @@ sCT = xr.open_dataset('waccm_season_ctrl_ens.nc')
 
 seasons = np.unique(sTS.time.dt.season)
 # plot per variable per roll per region, 1 panel for each season
-for f,field in enumerate(areas.keys()):
+for f,field in enumerate(fields):
     var = fc.variables[model][field]
     if var in var_fields.keys():
         var = var_fields[var]

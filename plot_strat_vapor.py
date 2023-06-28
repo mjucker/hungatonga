@@ -15,8 +15,9 @@ parser.add_argument('--qbo',dest='qbo',default=None,help='Only take ensemble mem
 parser.add_argument('--qmodel',dest='qbo_model',default=None,help='Use this model to assess QBO phase.')
 args = parser.parse_args()
 model = args.model
+qnme = {'+':'QBOW','-':'QBOE'}
 
-sns.set_context('paper')
+sns.set_context('notebook')
 sns.set_style('whitegrid')
 
 def ReadFile(file):
@@ -134,6 +135,8 @@ def PlotMass(mass,tco=None,appendix='',levels=20,colr=None,fig_out=False,kind='a
         tco.mean('member').where(pval<0.1).plot.contour(ax=ax,levels=[-10,-5],colors='k',x='time',zorder=3,linestyles='solid')
         ttle = ttle+', TCO anomalies'
         outFile = outFile+'_dTCO'
+    if args.qbo is not None:
+        ttle = ttle+', '+qnme[args.qbo]
     outFile = outFile+appendix+'.pdf'
     if args.qbo is not None:
         outFile = fc.RenameQBOFile(outFile,args.qbo)

@@ -13,6 +13,7 @@ parser.add_argument('--qbo',dest='qbo',default=None,help='Only take ensemble mem
 parser.add_argument('--years',dest='years',default=None,help='Only show this range of years.')
 parser.add_argument('--ylim',dest='ylim',default=None,nargs=2,help='Fix y limits of plot.')
 args = parser.parse_args()
+sns.set_context('notebook')
 
 option = 'area' #'DU','area'
 
@@ -23,8 +24,9 @@ operation = 'mean' #'mean','extr'
 do_spaghetti = False
 
 if args.years is not None:
-    years = [int(y) for y in args.years.split(',')]
-    yslice = {'time':slice('{:04d}'.format(years[0]),'{:04d}'.format(years[1]))}
+    yearl = [int(y) for y in args.years.split(',')]
+    # average from Sep year before to Feb year after
+    yslice = {'time':slice('{:04d}'.format(yearl[0]-1),'{:04d}'.format(yearl[1]))}
 if args.ylim is not None:
     ylims = [float(y) for y in args.ylim]
 
@@ -140,6 +142,8 @@ ax.set_title(ttle)
 ax.set_ylabel(ylabel[option])
 if args.ylim is not None:
     ax.set_ylim(*ylims)
+if args.years is not None:
+    ax.set_xlim(yearl[0]-1.5,yearl[1]-0.5)
 ax.set_xlabel('time [years since eruption]')
 outFile = 'figures/tco_anomaly_{0}.pdf'.format(option)
 if args.qbo is not None:

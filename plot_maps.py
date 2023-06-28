@@ -1,10 +1,11 @@
 #!env python
 import xarray as xr
+import numpy as np
 import seaborn as sns
 from aostools import climate as ac
 from hungatonga import functions as fc
 from matplotlib import pyplot as plt
-from matplotlib.ticker import AutoMinorLocator
+from matplotlib.ticker import AutoMinorLocator,FormatStrFormatter
 from shapely import geometry
 from cartopy import crs as ccrs
 import calendar
@@ -19,9 +20,11 @@ parser.add_argument('-v',dest='vars',default=None,nargs='+',help='Plot these var
 args = parser.parse_args()
 model = args.model
 qmodel = fc.ModName(model)
-sns.set_context('paper')
+sns.set_context('notebook')
 sns.set_style('whitegrid')
 colrs = sns.color_palette()
+
+pthresh = 0.1
 
 if args.vars is None:
     fields = ['TS','P','SLP','OLR','DLS','CLDTOT']
@@ -30,7 +33,7 @@ else:
 
 trans_fields = {'TS':'TREFHT'}
 
-scales = {'TS': 1, 'OLR': 1, 'DLS': 1, 'CLDTOT': 1, 'LWCF': 1, 'SWCF': 1}
+scales = {'TS': 1, 'OLR': 1, 'DLS': 1, 'CLDTOT': 1, 'LWCF': 1, 'SWCF': 1, 'ICEFRAC': 1}
 for var in fields:
     if 'CLD' in var:
         scales[var] = scales['CLDTOT']
@@ -53,6 +56,7 @@ seasons = {
     'SWCF'  :['DJF','JJA'],
     'SLP'   :default_seasons,
 #    'SLP'   :[1,7],
+    'ICEFRAC':default_seasons,
 }
 if args.season_overwrite is not None:
     aseas = args.season_overwrite
@@ -78,6 +82,7 @@ loncents = {
     'TS': cent_def,
     'CLDTOT':155,#cent_def,
     'SLP':cent_def,
+    'ICEFRAC':cent_def,
 }
 if args.center_overwrite is not None:
     for key in loncents.keys():
@@ -86,16 +91,17 @@ for var in fields:
     if 'CLD' in var:
         loncents[var] = loncents['CLDTOT']
 
-
+def_yrs = [3,7]
 avg_years = {
-    'P':   [4,7],
-    'OLR': [4,7],
-    'DLS': [4,7],
-    'TS':  [4,7],
-    'CLDTOT':  [4,7],
-    'LWCF':  [4,7],
-    'SWCF':  [4,7],
-    'SLP': [4,7],
+    'P':   def_yrs,
+    'OLR': def_yrs,
+    'DLS': def_yrs,
+    'TS':  def_yrs,
+    'CLDTOT':  def_yrs,
+    'LWCF':  def_yrs,
+    'SWCF':  def_yrs,
+    'SLP': def_yrs,
+    'ICEFRAC': def_yrs,
 }
 for var in fields:
     if 'CLD' in var:
@@ -110,6 +116,7 @@ vmaxs = {
     'DLS': 5.0,
     'LWCF': 5.0,
     'SWCF': 5.0,
+    'ICEFRAC': None,
     }
 for var in fields:
     if 'CLD' in var:
@@ -125,6 +132,7 @@ cmaps = {
     #'CLDTOT':'ocean',
     'CLDTOT':'cividis',
     'SLP':'BrBG_r',
+    'ICEFRAC':'cubehelix',
     }
 for var in fields:
     if 'CLD' in var:
@@ -139,6 +147,7 @@ labls = {
     'SWCF':'SWCF [W/m2]',
     'CLDTOT':'CLD []',
     'SLP':'SLP [hPa]',
+    'ICEFRAC':'[]',
     }
 for var in fields:
     if 'CLD' in var:
@@ -167,10 +176,15 @@ if args.qbo is not None:
 #dTS = pert - ctrl
 dTS = xr.open_dataset(args.model+'_season_delta_ens.nc',decode_times=False)
 dTS,_,_ = fc.CorrectTime(dTS)
-dTS = dTS.sel(time=slice(None,'0010'))
+end_year = '{0:04d}'.format(dTS.time[0].dt.year+9)
+dTS = dTS.sel(time=slice(None,end_year))
 
 nvars = len(fields)
-fig = plt.figure(figsize=[6*nseas,3*nvars])
+#ncols = nseas
+ncols = 2
+#nrows = nvars
+nrows = int(nseas/ncols*nvars)
+fig = plt.figure(figsize=[6*ncols,3*nrows])
 transf = {'transform':ccrs.PlateCarree()}
 
 axs = []
@@ -185,7 +199,7 @@ for f,field in enumerate(fields):
     faxs = []
     for s,season in enumerate(seasons[field]):
         p += 1
-        ax = fig.add_subplot(nvars,nseas,p,projection=proj_func(central_longitude=loncents[field]))
+        ax = fig.add_subplot(nrows,ncols,p,projection=proj_func(central_longitude=loncents[field]))
         axs.append(ax)
         faxs.append(ax)
         if isinstance(season,int):
@@ -198,7 +212,7 @@ for f,field in enumerate(fields):
         dm = dm.sel(time=slice('{0:04d}'.format(avg_years[field][0]),'{0:04d}'.format(avg_years[field][1]))).mean('time')
         pval = ac.StatTest(dm,0,'T','member',parallel=True)
         dmm = dm.mean('member')
-        cf = dmm.where(pval<0.1).plot(ax=ax,vmax=vmaxs[field],cmap=cmaps[field],add_colorbar=False,**transf)
+        cf = dmm.where(pval<pthresh).plot(ax=ax,vmax=vmaxs[field],cmap=cmaps[field],add_colorbar=False,**transf)
         ax.gridlines()
         ax.coastlines()
         if field in areas.keys():
@@ -220,10 +234,14 @@ for f,field in enumerate(fields):
                 r += 1
         ax.set_title(field+' anomalies, {0}, years {1}-{2}'.format(seas,avg_years[field][0],avg_years[field][1]))
     ac.AddColorbar(fig,faxs,cf,shrink=0.85,cbar_args={'label':labls[field]})
-ac.AddPanelLabels(axs,'upper left',ypos=1.1) 
+#if ncols == nseas:
+ac.AddPanelLabels(axs,'upper left',ypos=1.15) 
+#else:
+#    ac.AddPanelLabels(axs,xpos=-0.1,ypos=0.1) 
 outFile = 'figures/{0}_maps_boxed.pdf'.format(model)
 if args.vars is not None:
     outFile = outFile.replace('.pdf','_'+'_'.join(fields)+'.pdf')
+outFile = outFile.replace('.pdf','_{0:d}-{1:d}.pdf'.format(*avg_years[field]))
 if args.qbo is not None:
     outFile = fc.RenameQBOFile(outFile,args.qbo)
 fig.savefig(outFile,bbox_inches='tight',transparent=True)
@@ -237,10 +255,9 @@ for field in fields:
     if var in trans_fields.keys():
         var = trans_fields[var]
     da = dTS[var]*scales[field]
-    fig,ax = plt.subplots()
-    dt = []
-    nbars = 0
     for season in areas[field].keys():
+        dt = []
+        nbars = 0
         filtr = da['time.season'] == season
         das = da.isel(time=filtr)
         for region,sels in areas[field][season].items():
@@ -250,24 +267,38 @@ for field in fields:
             tmp['region'] = labl
             dt.append(tmp)
             nbars += 1
-    dx = xr.concat(dt,'region')
-    dx.name = field
-    df = fc.MakeDataFrame(dx,'region')
-    fig.set_figwidth(4*(1+0.5*(nbars-1)))
-    try: #new versions of sns
-        sns.barplot(data=df,x='year',y=field,hue='region',errorbar=('ci',90),ax=ax)
-    except:
-        sns.barplot(data=df,x='year',y=field,hue='region',ci=90,ax=ax)
-    ax.xaxis.set_minor_locator(AutoMinorLocator(2))
-    ax.grid(True,axis='x',which='minor')
-    sns.despine(bottom=True,left=True)
-    ax.set_title('{0} anomalies'.format(field))
-    ax.set_ylabel(labls[field])
-    ax.set_xlabel('year')
-    outFile = 'figures/{0}_bars_{1}.pdf'.format(model,field)
-    if args.qbo is not None:
-        outFile = fc.RenameQBOFile(outFile,args.qbo)
-    fig.savefig(outFile,bbox_inches='tight',transparent=True)
-    print(outFile)
+        if nbars == 0:
+            continue
+        fig,ax = plt.subplots()
+        dx = xr.concat(dt,'region')
+        dx.name = field
+        df = fc.MakeDataFrame(dx,'region')
+        fig.set_figwidth(4*(1+0.5*(nbars-1)))
+        try: #new versions of sns
+            sx = sns.barplot(data=df,x='year',y=field,hue='region',errorbar=('ci',90),ax=ax)
+        except:
+            sx = sns.barplot(data=df,x='year',y=field,hue='region',ci=90,ax=ax)
+        sns.move_legend(sx,[1.01,0.05])
+        #ax.xaxis.set_minor_locator(AutoMinorLocator(2))
+        #ax.grid(True,axis='x',which='minor')
+        nyrs = len(dx.year)
+        xticks = np.linspace(*ax.get_xlim(),nyrs+1)
+        ax.set_xticks(xticks)
+        xlabels = ['{0:g}'.format(np.abs(np.ceil(l))) for l in xticks]
+        ax.set_xticklabels(xlabels)
+        ax.set_xlim(xticks[0],xticks[-1])
+        ax.grid(True,axis='x')
+        sns.despine(bottom=True,left=True)
+        ax.set_title('{0} anomalies, {1}'.format(field,season))
+        ax.set_ylabel(labls[field])
+        ax.set_ylim(-vmaxs[field]*1.5,vmaxs[field]*1.5)
+        ax.set_xlabel('time [years since eruption]')
+        ylims = ax.get_ylim()
+        ax.plot([avg_years[field][0]-0.5,avg_years[field][1]+0.5],[ylims[0],ylims[0]],color='r',lw=2)
+        outFile = 'figures/{0}_bars_{1}_{2}.pdf'.format(model,field,season)
+        if args.qbo is not None:
+            outFile = fc.RenameQBOFile(outFile,args.qbo)
+        fig.savefig(outFile,bbox_inches='tight',transparent=True)
+        print(outFile)
     
             

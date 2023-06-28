@@ -32,8 +32,8 @@ def MakeDataFrame(ds,colname):
                 memb.append(dt.member.values[m])
                 years.append(dt.year.values[y])
                 vals.append(float(dt.isel(member=m,year=y).values))
-    yr1 = years[0]
-    years = [y-yr1+1 for y in years]
+    #yr1 = years[0]
+    #years = [y-yr1+1 for y in years]
     df = pd.DataFrame(data={colname:cls,'member':memb,'year':years,ds.name:vals})
     return df
 
@@ -52,12 +52,15 @@ def CorrectTime(ds,decode=True):
         if startmonth == 12: #start with DJF
             ds = ds.assign_coords({'time':ds.time+31})
             ds.time.attrs['calendar'] = calendar
-            correctyear = 0
-        else:
-            correctyear = 1
+        #    correctyear = 0
+        #else:
+        #    correctyear = 1
+        correctyear = 0
         units = units.replace('{:04d}'.format(startyear),'{:04d}'.format(correctyear))
         ds.time.attrs['units'] = units
-        return xr.decode_cf(ds),units,calendar
+        if decode:
+            ds = xr.decode_cf(ds)
+        return ds,units,calendar
     else:
         num_years = ds.time[0]//daysperyear
         ntime = ds.time - num_years*daysperyear + mid_month
@@ -68,7 +71,7 @@ def CorrectTime(ds,decode=True):
     return ds,units,calendar
 
 
-def GlobalMeanPlot(ta,name=None,fig_out=False,fig=None,ax=None,ttle=None,pval_parallel=True,plim=0.1,label='_none_',color=None):
+def GlobalMeanPlot(ta,name=None,fig_out=False,fig=None,ax=None,ttle=None,pval_parallel=True,plim=0.1,label='_none_',color=None,ls=None,fill=True):
     from matplotlib import pyplot as plt
     import cftime
     import nc_time_axis
@@ -91,12 +94,16 @@ def GlobalMeanPlot(ta,name=None,fig_out=False,fig=None,ax=None,ttle=None,pval_pa
         ta_mns = ta_mn.where(pval<plim)
     else:
         ta_mns = ta_mn.where(pval>plim)
-    ax.plot(times,ta_mns,color=colr,lw=2,label=label)
+    ax.plot(times,ta_mns,color=colr,lw=2,label=label,ls=ls)
     #ta_mn.plot.line(ax=ax,x='time',color=colr,ls='--',lw=1)
     #ta_mn.where(pval<0.1).plot.line(ax=ax,x='time',color=colr,lw=2)
     lower = ta_mn - ta_std
     upper = ta_mn + ta_std
-    ax.fill_between(times,lower,upper,color=colr,alpha=0.3,label='_none_')
+    if fill:
+        ax.fill_between(times,lower,upper,color=colr,alpha=0.3,label='_none_')
+    else:
+        ax.plot(times, lower, color=colr,lw=0.5,alpha=0.7,label='_none_')
+        ax.plot(times, upper, color=colr,lw=0.5,alpha=0.7,label='_none_')
     first_month = ta.time.dt.month.values[0]
     first_tick = (6-first_month+1)%6
     tick_vals = times[first_tick::6]
@@ -112,7 +119,7 @@ def GlobalMeanPlot(ta,name=None,fig_out=False,fig=None,ax=None,ttle=None,pval_pa
         if tick.month == 7:
             labls.append('')
         else:
-            labls.append('{}'.format(tick.year-1))
+            labls.append('{}'.format(tick.year))
     ax.set_xticklabels(labls)
     ax.set_xlabel('time [years since eruption]')
     if ttle is None:
@@ -177,7 +184,7 @@ def ReadMLSMap():
     return mls.map_data
 
 
-variables = {'waccm': {'T':'T','U':'U','SLP':'PSL','O3':'O3','TS':'TREFHT','TREFHT':'TREFHT','Q':'Q','P':'PREC','TCWV':'TMQ','TCO':'TCO','OLR':'FLNT','DLS':'FLDS','OMEGA':'OMEGA','TH':'TH','VTH3d':'VTH3d','CLDTOT':'CLDTOT','CLDLOW':'CLDLOW','CLDHGH':'CLDHGH','CLDMED':'CLDMED','LWCF':'LWCF','SWCF':'SWCF'},
+variables = {'waccm': {'T':'T','U':'U','V':'V','Z':'Z3','SLP':'PSL','O3':'O3','TS':'TREFHT','TREFHT':'TREFHT','Q':'Q','P':'PREC','TCWV':'TMQ','TCO':'TCO','OLR':'FLNT','DLS':'FLDS','OMEGA':'OMEGA','TH':'TH','VTH3d':'VTH3d','CLDTOT':'CLDTOT','CLDLOW':'CLDLOW','CLDHGH':'CLDHGH','CLDMED':'CLDMED','LWCF':'LWCF','SWCF':'SWCF','ICEFRAC':'ICEFRAC'},
              'mima' : {'T':'temp','U':'ucomp','V':'vcomp','SLP':'slp','TS':'t_surf','Q':'sphum','P':'precip','OLR':'olr','TCWV':'tcwv'}}
 for mod in ['aqua','aqua_sponge','hthh','hthh_fix','bench_SH']:
     variables[mod] = variables['mima']
@@ -260,9 +267,11 @@ def RenameQBOFile(filename,qbo,ftype='.pdf'):
 
 areas = {}
 areas['P']  = {'DJF':{
-                'ITCZ':{'lon':slice(180.1,210), 'lat': slice(5,10)},
-                'MC'  :{'lon':slice(120,140),   'lat': slice(0,20)},
-                'Europe':{'lon':slice(0.1,30),   'lat': slice(45,53)},
+                #'ITCZ':{'lon':slice(180.1,210), 'lat': slice(5,10)},
+                'Pacific':{'lon':slice(180.1,220),'lat':slice(5,25)},
+                #'MC'  :{'lon':slice(120,140),   'lat': slice(0,20)},
+                'MC'  :{'lon':slice(110,150),   'lat': slice(0,20)},
+                #'Europe':{'lon':slice(0.1,30),   'lat': slice(45,53)},
                 },
                'JJA':{
                 #'ITCZ':{'lon':slice(180,210), 'lat': slice(5,10)},
@@ -271,11 +280,11 @@ areas['P']  = {'DJF':{
                 'IOS':  {'lon':slice(40,100),     'lat': slice(-10,-2)},
                 },
                'MAM':{
-                'ITCZS':{'lon':slice(180.1,210), 'lat': slice(-15,-10)},
-                'SPCZN':{'lon':slice(145,165), 'lat': slice(-15,-10)},
+                #'ITCZS':{'lon':slice(180.1,210), 'lat': slice(-15,-10)},
+                #'SPCZN':{'lon':slice(145,165), 'lat': slice(-15,-10)},
                 },
                'SON':{
-                'ITCZ':{'lon':slice(180.1,200), 'lat': slice(10,15)},
+                #'ITCZ':{'lon':slice(180.1,200), 'lat': slice(10,15)},
                 #'MC'  :{'lon':slice(120,140),   'lat': slice(0,20)},
                 },
                }
@@ -284,16 +293,18 @@ areas['TS'] = {'DJF':{
                 'Eurasia': {'lon':slice(40,80)  ,'lat':slice(35,50)},
                 'NAmerica':{'lon':slice(235,265),'lat':slice(45,65)},
                 #'Australia':{'lon':slice(120,145),'lat':slice(-28,-18)},
-                'NAfrica': {'lon':slice(-10,30)  ,'lat':slice(20,35)},
+                #'NAfrica': {'lon':slice(-10,30)  ,'lat':slice(20,35)},
                },
          'JJA':{
                 #'Scandinavia':  {'lon':slice(20,60)  ,'lat':slice(55,70)},
                 #'NAmerica': {'lon':slice(260,290),'lat':slice(40,60)},
                 'Australia':{'lon':slice(120,145),'lat':slice(-28,-18)},
                 'Arctic':{'lon':slice(40,270),'lat':slice(75,90)},
+                'Amundsen':{'lon':slice(185,280),'lat':slice(-80,-65)},
                },
          'MAM':{
                 'Siberia': {'lon':slice(50,90),'lat':slice(45,65)},
+                'Arctic':{'lon':slice(40,270),'lat':slice(75,90)},
                },
          'SON': {
                 'NAsia'  : {'lon':slice(70,120),'lat':slice(45,55)},

@@ -14,6 +14,7 @@ parser.add_argument('-s',dest='seasons',default=['DJF','MAM','JJA','SON'],nargs=
 parser.add_argument('-Y',dest='plot_years',default=None,help='Only plot these years. form startYear,stopYear')
 parser.add_argument('--qbo',dest='qbo',default=None,help='Only take ensemble members which start in given QBO phase. Either + or - if given.')
 args = parser.parse_args()
+sns.set_context('notebook')
 
 seasons = args.seasons
 nseas = len(seasons)
@@ -59,17 +60,17 @@ else:
     levels = np.linspace(*levs)
 
 if args.years is None:
-    cwrap = min(5,len(diffs.time)//4)
-    if cwrap <= 5:
-        nrows = 1
-    else:
-        nrows = 10//cwrap
+    cwrap = 2#min(5,len(diffs.time)//4)
+    #if cwrap <= 5:
+    #    nrows = 1
+    #else:
+    nrows = 5//cwrap
     filtrdim = 'time.season'
     timedim = 'time'
-    ttle = ', YY years'
+    ttle = ', year YY'
 else:
-    cwrap = nseas
-    nrows = 1
+    cwrap = 2
+    nrows = int(nseas/cwrap)
     fig,axs,transf = ac.Projection('PlateCarree',ncols=cwrap,nrows=nrows,kw_args={'central_longitude':155})
     years = [int(y) for y in args.years.split(',')]
     yslce = slice('{0:04d}'.format(years[0]),'{0:04d}'.format(years[1]))
@@ -93,19 +94,20 @@ for s,season in enumerate(seasons):
     for a,ax in enumerate(axs.flat):
         if args.years is None:
             tmpp = tmp.isel(time=a)
-            attle = ttle.replace('YY',str(a))
+            yr = tmpp.time.dt.year.values
+            attle = ttle.replace('YY',str(yr))
         else:
             if s == a:
                 tmpp = tmp.sel(season=season)
                 attle = ttle
             else:
                 continue
-        cf = tmpp.plot.contourf(ax=ax,x='lon',levels=levels,**transf)
+        cf = tmpp.plot.contourf(ax=ax,x='lon',levels=levels,extend='both',**transf)
         if not ax.get_subplotspec().is_last_row():
             ax.set_xlabel('')
         if not ax.get_subplotspec().is_first_col():
             ax.set_ylabel('')
-        ax.set_title('{0}{1}, {2}{3}'.format(var,olevel,season,attle))
+        ax.set_title('{0}{1}, {2}{3}'.format(args.var,olevel,season,attle))
         ax.gridlines()
         ax.coastlines()
     ac.AddPanelLabels(axs,'upper left',ypos=1.12) 
@@ -116,7 +118,7 @@ for s,season in enumerate(seasons):
             suff = season
         else:
             suff = '{0}-{1}'.format(*years)
-        outFile = 'figures/{3}_{0}{1}_{2}.pdf'.format(var,olevel,suff,model)
+        outFile = 'figures/{3}_{0}{1}_{2}.pdf'.format(args.var,olevel,suff,model)
         if args.qbo:
             outFile = fc.RenameQBOFile(outFile,args.qbo)
         fig.savefig(outFile,bbox_inches='tight')

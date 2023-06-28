@@ -14,7 +14,7 @@ parser.add_argument('-D',dest='diff',default='delta',help='Compute the differenc
 args = parser.parse_args()
 model = args.model
 qmodel = fc.ModName(model)
-sns.set_context('paper')
+sns.set_context('notebook')
 sns.set_style('whitegrid')
 colrs = sns.color_palette()
 
@@ -42,7 +42,7 @@ if 'psi' in args.var1 or 'psi' in args.var2:
     tmp = tmp[psivar]
     delta = xr.merge([delta,tmp])
 delta,_,_ = fc.CorrectTime(delta)
-delta = delta.sel(time=slice(None,'{:04d}-11'.format(cutoff_year+1)))
+delta = delta.sel(time=slice(None,'{:04d}-11'.format(cutoff_year)))
 # qbo
 ctrl = xr.open_dataset('{0}_ctrl_ens.nc'.format(model),decode_times=False)
 qbo_pos,qbo_neg = fc.CheckQBO(ctrl,qmodel)
@@ -72,7 +72,7 @@ for a,ax in enumerate(fg.axs.flat):
     t = dpsis.isel(time=a).time
     yr = int(t.dt.year.values)
     seas=t.dt.season.values
-    if seas == 'DJF': yr += 1
+    #if seas == 'DJF': yr += 1
     ax.set_title('year {0} {1}'.format(yr,seas))
     if ax.get_subplotspec().is_first_col():
         ax.set_ylabel('pressure [hPa]')

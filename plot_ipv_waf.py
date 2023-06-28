@@ -13,7 +13,7 @@ parser.add_argument('-v',dest='variable',default='ipv',help='which variable to s
 args = parser.parse_args()
 model = args.model
 qmodel = fc.ModName(model)
-sns.set_context('paper')
+sns.set_context('notebook')
 sns.set_style('whitegrid')
 colrs = sns.color_palette()
 var = args.variable
@@ -56,35 +56,40 @@ if args.qbo is not None:
 if args.years is not None:
     yrs = [int(y) for y in args.years.split(',')]
     tslice = {'time':slice('{:04d}'.format(yrs[0]),'{:04d}'.format(yrs[1]))}
-    dipvsm = dipvs.sel(tslice).groupby('time.season').mean()
-    wafsm = wafs.sel(tslice).groupby('time.season').mean()
+    dipvsm = dipvs.sel(tslice)
+    wafsm = wafs.sel(tslice)
+    
+dipvsm = dipvsm.groupby('time.season').mean()
+wafsm = wafsm.groupby('time.season').mean()
 
-    fig,axs,transf = ac.Projection('PlateCarree',ncols=nseas,kw_args={'central_longitude':155})
-    fig.set_figheight(3)
-    fig.set_figwidth(6*nseas)
+fig,axs,transf = ac.Projection('PlateCarree',ncols=nseas,kw_args={'central_longitude':155})
+fig.set_figheight(3)
+fig.set_figwidth(6*nseas)
 
-    pval = ac.StatTest(dipvsm,0,'T','member',parallel=True)
-    dipvsm = dipvsm.mean('member').where(pval<0.1)
-    dipvsm = ac.CloseGlobe(dipvsm)
+pval = ac.StatTest(dipvsm,0,'T','member',parallel=True)
+dipvsm = dipvsm.mean('member').where(pval<0.1)
+dipvsm = ac.CloseGlobe(dipvsm)
 
-    wafa = np.sqrt(wafsm.wx**2+wafsm.wy**2)
-    pval = ac.StatTest(wafa,0,'T','member',parallel=True)
-    wafsm = wafsm.mean('member').where(pval<0.1)
+wafa = np.sqrt(wafsm.wx**2+wafsm.wy**2)
+pval = ac.StatTest(wafa,0,'T','member',parallel=True)
+wafsm = wafsm.mean('member').where(pval<0.1)
 
-    for s,seas in enumerate(seasons):
-        cf=dipvsm.sel(season=seas).plot.contourf(levels=levels[var],ax=axs[s],add_colorbar=False,extend='both',**transf)
-        wafsm.sel(season=seas).plot.quiver(x='lon',y='lat',u='wx',v='wy',ax=axs[s],**transf)
-        axs[s].gridlines()
-        axs[s].coastlines()
-        axs[s].set_title(tvar+' & 200hPa WAF, {0}'.format(seas))
-        axs[s].set_extent([0,360,-90,90],crs=transf['transform'])
-    ac.AddColorbar(fig,axs,cf,cbar_args={'extend':'both'})
-    ac.AddPanelLabels(axs,'upper left',ypos=1.15)
-    outFile = 'figures/{0}_{1}_waf_season_year.pdf'.format(model,var)
-    if args.years is not None:
-        outFile = outFile.replace('_year.pdf','_years{0}-{1}.pdf'.format(*yrs))
-    if args.qbo is not None:
-        outFile = fc.RenameQBOFile(outFile,args.qbo)
-    fig.savefig(outFile,bbox_inches='tight',transparent=True)
-    print(outFile)
+for s,seas in enumerate(seasons):
+    cf=dipvsm.sel(season=seas).plot.contourf(levels=levels[var],ax=axs[s],add_colorbar=False,extend='both',**transf)
+    Q = wafsm.sel(season=seas).plot.quiver(x='lon',y='lat',u='wx',v='wy',ax=axs[s],scale=3e2,**transf)
+    if s == 0:
+        axs[s].quiverkey(Q,1.1,0.5,20,r'20 $\frac{\mathrm{m^2}}{\mathrm{s^2}}$')
+    axs[s].gridlines()
+    axs[s].coastlines()
+    axs[s].set_title(tvar+' & 200hPa WAF, {0}'.format(seas))
+    axs[s].set_extent([0,360,-90,90],crs=transf['transform'])
+ac.AddColorbar(fig,axs,cf,cbar_args={'extend':'both'})
+ac.AddPanelLabels(axs,'upper left',ypos=1.15)
+outFile = 'figures/{0}_{1}_waf_season_year.pdf'.format(model,var)
+if args.years is not None:
+    outFile = outFile.replace('_year.pdf','_years{0}-{1}.pdf'.format(*yrs))
+if args.qbo is not None:
+    outFile = fc.RenameQBOFile(outFile,args.qbo)
+fig.savefig(outFile,bbox_inches='tight',transparent=True)
+print(outFile)
 
