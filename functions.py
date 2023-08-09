@@ -148,6 +148,10 @@ def ConvertTime2Years(ds):
 def ReadMLS(pure_anom=False):
     mls  = xr.open_dataset('MLS_data.nc')
     #mls = mls.assign_coords({'TS_Time':mls.ts_Time,'ZM_Lat':mls.zm_lat})
+    if 'ts_Time' in mls.coords:
+        mls = mls.rename({'ts_Time':'TS_Time'})
+    if 'zm_lat' in mls.data_vars:
+        mls = mls.rename({'zm_lat':'ZM_Lat'})
     mls = mls.rename({'TS_Time':'time','ZM_Lat':'lat'})
     # align real eruption (max around Jan 25) with WACCM sims (Jan 1)
     mls.time.attrs['units'] = 'days since 0000-10-05'
@@ -184,8 +188,8 @@ def ReadMLSMap():
     return mls.map_data
 
 
-variables = {'waccm': {'T':'T','U':'U','V':'V','Z':'Z3','SLP':'PSL','O3':'O3','TS':'TREFHT','TREFHT':'TREFHT','Q':'Q','P':'PREC','TCWV':'TMQ','TCO':'TCO','OLR':'FLNT','DLS':'FLDS','OMEGA':'OMEGA','TH':'TH','VTH3d':'VTH3d','CLDTOT':'CLDTOT','CLDLOW':'CLDLOW','CLDHGH':'CLDHGH','CLDMED':'CLDMED','LWCF':'LWCF','SWCF':'SWCF','ICEFRAC':'ICEFRAC'},
-             'mima' : {'T':'temp','U':'ucomp','V':'vcomp','SLP':'slp','TS':'t_surf','Q':'sphum','P':'precip','OLR':'olr','TCWV':'tcwv'}}
+variables = {'waccm': {'T':'T','U':'U','V':'V','Z':'Z3','SLP':'PSL','O3':'O3','TS':'TREFHT','TREFHT':'TREFHT','Q':'Q','P':'PREC','TCWV':'TMQ','TCO':'TCO','OLR':'FLNT','DLS':'FLDS','DSS':'FSDS','OMEGA':'OMEGA','TH':'TH','VTH3d':'VTH3d','CLDTOT':'CLDTOT','CLDLOW':'CLDLOW','CLDHGH':'CLDHGH','CLDMED':'CLDMED','LWCF':'LWCF','SWCF':'SWCF','ICEFRAC':'ICEFRAC'},
+             'mima' : {'T':'temp','U':'ucomp','V':'vcomp','SLP':'slp','TS':'t_surf','Q':'sphum','P':'precip','OLR':'olr','TCWV':'tcwv','DLS':'flux_lw','DSS':'flux_sw'}}
 for mod in ['aqua','aqua_sponge','hthh','hthh_fix','bench_SH']:
     variables[mod] = variables['mima']
 

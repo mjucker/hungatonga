@@ -19,15 +19,20 @@ python $repdir/hungatonga/plot_strat_vapor.py -m waccm --qbo -
 python $repdir/hungatonga/plot_strat_vapor.py -m waccm --qbo +
 python $repdir/hungatonga/plot_plevel_season.py -m waccm -v U -l 300 -L -4 4 17 -s DJF -Y 1,4 --qbo -
 python $repdir/hungatonga/plot_plevel_season.py -m waccm -v U -l 300 -L -4 4 17 -s DJF -Y 1,4 --qbo +
-python $repdir/hungatonga/plot_plevel_season.py -m waccm -v U -l 300 -L -4 4 17 -s DJF JJA 
-python $repdir/hungatonga/plot_plevel_season.py -m waccm -v V -l 300 -L -4 4 17 -s DJF JJA
-python $repdir/hungatonga/plot_plevel_season.py -m waccm -v Z -l 300 -L -80 80 17 -s DJF JJA
+python $repdir/hungatonga/plot_plevel_season.py -m waccm -v U -l 300 -L -4 4 17 -s DJF JJA -y 3,7
+python $repdir/hungatonga/plot_plevel_season.py -m waccm -v V -l 300 -L -4 4 17 -s DJF JJA -y 3,7
+python $repdir/hungatonga/plot_plevel_season.py -m waccm -v Z -l 300 -L -80 80 17 -s DJF JJA -y 3,7
 python $repdir/hungatonga/plot_maps.py -m waccm --center 155 -v TS P
 python $repdir/hungatonga/plot_maps.py -m waccm --center 155 -v DLS CLDTOT LWCF SWCF
 python $repdir/hungatonga/plot_ipv_waf.py -m waccm -s DJF JJA -y 3,7
 python $repdir/hungatonga/plot_lines_regions.py -m waccm -v TS
 
 cd ../mima
-python $repdir/hungatonga/plot_maps.py -m bench_SH_fix_125Tg --center 155 -v TS
-python $repdir/hungatonga/plot_maps.py -m bench_SH_fixq_o3init_125Tg --center 155 -v TS
-python $repdir/hungatonga/plot_maps.py -m bench_SH_fixo3_qinit_125Tg --center 155 -v TS
+python $repdir/hungatonga/plot_maps.py -m bench_SH_fix_125Tg --center 155 -v TS P -b
+python $repdir/hungatonga/plot_maps.py -m bench_SH_fixq_o3init_125Tg --center 155 -v TS P -b
+python $repdir/hungatonga/plot_maps.py -m bench_SH_fixo3_qinit_125Tg --center 155 -v TS P -b
+python $repdir/hungatonga/plot_plevel_season.py -m bench_SH_fix_125Tg -v V -l 300 -L -3 3 16 -y 3,7
+python $repdir/hungatonga/plot_zm_season.py -m waccm -s DJF JJA -y 3,7 -v T -L -0.5 0.5 26
+python $repdir/hungatonga/plot_zm_season.py -m waccm -s DJF JJA -y 3,7 -v U
+
+

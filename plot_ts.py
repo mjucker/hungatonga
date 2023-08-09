@@ -11,12 +11,13 @@ parser.add_argument('-s',dest='savefig',action="store_false",help='do NOT save t
 parser.add_argument('--qbo',dest='qbo',default=None,help='Only take ensemble members which start in given QBO phase. Either + or - if given.')
 args = parser.parse_args()
 model = args.model
+qmodel = fc.ModName(model)
 sns.set_context('paper')
 sns.set_style('whitegrid')
-colrs = sns.color_palette()
+scolrs = sns.color_palette()
 
 max_year = 10
-avg_years= [4,7]
+avg_years= [3,7]
 vmax = 1.5
 #vmax = None
 
@@ -36,12 +37,12 @@ if args.qbo is not None:
         pert = pert.isel(member=qbo_neg)
         ctrl = ctrl.isel(member=qbo_neg)
 
-pert = pert[fc.variables[model][var]]
-ctrl = ctrl[fc.variables[model][var]]
+pert = pert[fc.variables[qmodel][var]]
+ctrl = ctrl[fc.variables[qmodel][var]]
 
 dTS = pert - ctrl
 dTS,_,_ = fc.CorrectTime(dTS.to_dataset())
-dTS = dTS[fc.variables[model][var]]
+dTS = dTS[fc.variables[qmodel][var]]
 dTS = dTS.sel(time=slice(None,'{0:04d}'.format(max_year)))
 
 #dTS2 = fc.ReadFile('waccm_pert_ens.nc').TS - fc.ReadFile('waccm_ctrl_ens.nc').TS
@@ -75,6 +76,37 @@ if args.savefig:
     fig.savefig(outFile,bbox_inches='tight',robust=True)
     print(outFile)
 
+fig,ax = plt.subplots()
+gmt = ac.GlobalAvgXr(dTS.where(dTS!=0).mean('lon'),[-90,90])
+pval = ac.StatTest(gmt,0,'T','member',parallel=True)
+gmtm = gmt.mean('member')
+gmts = gmt.std('member')
+p = gmtm.plot.line(ax=ax,color=scolrs[0],lw=1,ls='--')
+gmtm.where(pval<0.1).plot.line(ax=ax,color=scolrs[0],lw=2,label='monthly')
+x = p[0].get_xdata()
+ax.fill_between(x,gmtm+gmts,gmtm-gmts,color=scolrs[0],alpha=0.3)
+gmts = gmt.resample(time='QS-DEC').mean()
+gmtsm = gmts.mean('member')
+gmtss = gmts.std('member')
+pval = ac.StatTest(gmts,0,'T','member',parallel=True)
+p = gmtsm.plot.line(ax=ax,color=scolrs[1],lw=1,ls='--')
+gmtsm.where(pval<0.1).plot.line(ax=ax,color=scolrs[1],lw=2,label='seasonal')
+x = p[0].get_xdata()
+ax.fill_between(x,gmtsm+gmtss,gmtsm-gmtss,color=scolrs[1],alpha=0.3)
+djf = (gmts.time.dt.month == 12)*(gmts.time.dt.year >= avg_years[0])*(gmts.time.dt.year <= avg_years[1])
+gmtdjf = gmts.isel(time=djf).mean('time')
+gmtdjfm= gmtdjf.mean('member')
+gmtdjfs= gmtdjf.std('member')
+ax.set_ylabel('global mean land surface temperature anomaly [K]')
+ax.set_xlabel('time [years since eruption]')
+ax.set_title(u'DJF years {0}-{1} anomaly = {2:6.3f}$\pm${3:6.3f}K'.format(avg_years[0],avg_years[1],gmtdjfm,gmtdjfs))
+ax.legend()
+outFile = 'figures/{0}_{1}_land_global.pdf'.format(model,var)
+if args.qbo is not None:
+    outFile = fc.RenameQBOFile(outFile,args.qbo)
+if args.savefig:
+    fig.savefig(outFile,bbox_inches='tight',robust=True)
+    print(outFile)
 
 select_seasons = ['DJF','JJA','MAM','SON']
 

@@ -30,10 +30,10 @@ outFile2d  = args.outFile.replace('.nc','.2d.nc')
 
 #vars_3d = ['O3','Z3','Q','U','V','T','RELHUM','UU','VV','VQ','VU','VT','VTH3d','QRS','QRL','OMEGA','CLOUD','CLDICE','CLDLIQ','TH']
 vars_3d = ['O3','Z3','Q','U','V','T','TH','UV3d','VTH3d','UW3d','QRS','QRL','OMEGA','CLOUD','CLDICE','CLDLIQ']
-#vars_3d = ['Q']
+#vars_3d = ['U']
 #vars_2d = ['CLDHGH','CLDLOW','CLDMED','CLDTOT','FLDS','FLDSC','FLNT','FLNTC','FSDS','FSDSC','FSNS','FSNSC','ICEFRAC','LANDFRAC','LHFLX','LWCF','OCNFRAC','PBLH','PHIS','PRECC','PRECL','PRECSC','PRECSL','PSL','SHFLX','SWCF','TMQ','TROPP_FD','TS','TSMN','TSMX','TREFHT',]
-vars_2d = ['CLDTOT','CLDHGH','CLDLOW','CLDMED','FLNT','LANDFRAC','PHIS','PRECC','PRECL','PRECSC','PRECSL','PSL','TMQ','TROPP_FD','TS','TSMN','TSMX','TREFHT','U10','V10','FLDS','LWCF','SWCF','ICEFRAC']
-#vars_2d = ['ICEFRAC']
+vars_2d = ['CLDTOT','CLDHGH','CLDLOW','CLDMED','FLNT','LANDFRAC','PHIS','PRECC','PRECL','PRECSC','PRECSL','PSL','TMQ','TROPP_FD','TS','TSMN','TSMX','TREFHT','U10','V10','FLDS','FSDS','LWCF','SWCF','ICEFRAC']
+#vars_2d = ['FSDS']
 
 ## for MiMA input
 #vars_3d = ['O3','Q','U','V','T','Z3']

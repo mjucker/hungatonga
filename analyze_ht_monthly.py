@@ -11,6 +11,8 @@ ctrldir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_fix_ctrl/'
 #pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_fix_125Tg/'
 pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_fixq_o3init_125Tg/'
 #pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_fixo3_qinit_125Tg/'
+ctrldir = '/scratch/w40/mxj563/mima/bench_SH_fix_ctrl/'
+pertdir = '/scratch/w40/mxj563/mima/bench_SH_fix_125Tg/'
 
 #ctrldir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_ctrl/'
 #pertdir = '/g/data/w40/mxj563/work/HungaTonga/mima/bench_SH_125Tg/'

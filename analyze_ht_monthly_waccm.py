@@ -9,8 +9,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-c',dest='case',default='100Tg')
 args = parser.parse_args()
 
-keep_vars = ['O3','U','V','T','TS','TREFHT','Q','PSL','PRECC','PRECL','PRECSC','PRECSL','Z3','TCO','OMEGA','FLNT','CLDICE','U10','V10','CLDTOT','FLDS','CLDHGH','CLDMED','CLDLOW','LWCF','SWCF','ICEFRAC']
-#keep_vars = ['ICEFRAC']
+keep_vars = ['O3','U','V','T','TS','TREFHT','Q','PSL','PRECC','PRECL','PRECSC','PRECSL','Z3','TCO','OMEGA','FLNT','CLDICE','U10','V10','CLDTOT','FLDS','FSDS','CLDHGH','CLDMED','CLDLOW','LWCF','SWCF','ICEFRAC']
+#keep_vars = ['FSDS']
 
 sum_vars = {'PREC':['PRECC','PRECL','PRECSC','PRECSL']}
 #sum_vars = {}

@@ -17,6 +17,9 @@ args = parser.parse_args()
 model = args.model
 qnme = {'+':'QBOW','-':'QBOE'}
 
+
+do_daily = False
+
 sns.set_context('notebook')
 sns.set_style('whitegrid')
 
@@ -67,11 +70,8 @@ pert = xr.merge([pert[Q],pert.CLDICE])
 ctrl = xr.merge([ctrl[Q],ctrl.CLDICE])
 
 
-
-do_daily = False
 pert_file_d = 'waccm_daily_pert_ens.nc'
-if os.path.isfile(pert_file_d):
-    do_daily = True
+if os.path.isfile(pert_file_d) and do_daily:
     pert_d = ReadFile(pert_file_d).sel(levslice)
     pert_d = xr.merge([pert_d.CLDICE,pert_d.Q])
 
