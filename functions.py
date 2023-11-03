@@ -188,7 +188,7 @@ def ReadMLSMap():
     return mls.map_data
 
 
-variables = {'waccm': {'T':'T','U':'U','V':'V','Z':'Z3','SLP':'PSL','O3':'O3','TS':'TREFHT','TREFHT':'TREFHT','Q':'Q','P':'PREC','TCWV':'TMQ','TCO':'TCO','OLR':'FLNT','DLS':'FLDS','DSS':'FSDS','OMEGA':'OMEGA','TH':'TH','VTH3d':'VTH3d','CLDTOT':'CLDTOT','CLDLOW':'CLDLOW','CLDHGH':'CLDHGH','CLDMED':'CLDMED','LWCF':'LWCF','SWCF':'SWCF','ICEFRAC':'ICEFRAC'},
+variables = {'waccm': {'T':'T','U':'U','V':'V','Z':'Z3','SLP':'PSL','O3':'O3','TS':'TREFHT','TREFHT':'TREFHT','Q':'Q','P':'PREC','TCWV':'TMQ','TCO':'TCO','OLR':'FLNT','DLS':'FLDS','DSS':'FSDS','DLSC':'FLDSC','DSSC':'FSDSC','OMEGA':'OMEGA','TH':'TH','VTH3d':'VTH3d','CLDTOT':'CLDTOT','CLDLOW':'CLDLOW','CLDHGH':'CLDHGH','CLDMED':'CLDMED','LWCF':'LWCF','SWCF':'SWCF','ICEFRAC':'ICEFRAC'},
              'mima' : {'T':'temp','U':'ucomp','V':'vcomp','SLP':'slp','TS':'t_surf','Q':'sphum','P':'precip','OLR':'olr','TCWV':'tcwv','DLS':'flux_lw','DSS':'flux_sw'}}
 for mod in ['aqua','aqua_sponge','hthh','hthh_fix','bench_SH']:
     variables[mod] = variables['mima']
@@ -318,5 +318,12 @@ areas['TS'] = {'DJF':{
          #'EAsia':   {'lon':slice(100,125),'lat':slice(40,55)},
          #'Australia':{'lon':slice(115,155),'lat':slice(-38,-20)}
          }
-for var in ['CLDTOT','DLS','OLR','LWCF','SWCF']:
+for var in ['CLDTOT','DLS','DLSC','DSSC','OLR','LWCF','SWCF']:
     areas[var] = areas['TS']
+
+def ComputeRadiativeFlux(HR,FRT,level):
+    '''HR is heating rate, QRL or QRS
+       HRT is net radiative flux at top of atmosphere if `lev` goes from top to bottom'''
+    from aostools import constants as at
+    hrl = FRT - at.cp/at.g*HR.sel(lev=slice(0,level)).integrate('lev')*100
+    return hrl
