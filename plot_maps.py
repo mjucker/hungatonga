@@ -34,7 +34,7 @@ else:
 
 trans_fields = {'TS':'TREFHT'}
 
-scales = {'TS': 1, 'OLR': 1, 'DLS': 1, 'CLDTOT': 1, 'LWCF': 1, 'SWCF': 1, 'ICEFRAC': 1,'DSS': 1}
+scales = {'TS': 1, 'OLR': 1, 'DLS': 1, 'DLSC': 1, 'CLDTOT': 1, 'LWCF': 1, 'SWCF': 1, 'ICEFRAC': 1,'DSS': 1, 'DSSC': 1}
 for var in fields:
     if 'CLD' in var:
         scales[var] = scales['CLDTOT']
@@ -52,6 +52,8 @@ seasons = {
     'OLR'   :['DJF','JJA'],
     'DLS'   :['DJF','JJA'],
     'DSS'   :['DJF','JJA'],
+    'DLSC'  :['DJF','JJA'],
+    'DSSC'  :['DJF','JJA'],
     'P'     :default_seasons,
     'CLDTOT':['DJF','JJA'],
     'LWCF'  :['DJF','JJA'],
@@ -80,6 +82,8 @@ loncents = {
     'OLR':155, #cent_def,
     'DLS':155, #cent_def,
     'DSS':155, #cent_def,
+    'DLSC':155, #cent_def,
+    'DSSC':155, #cent_def,
     'LWCF':155, #cent_def,
     'SWCF':155, #cent_def,
     'TS': cent_def,
@@ -100,6 +104,8 @@ avg_years = {
     'OLR': def_yrs,
     'DLS': def_yrs,
     'DSS': def_yrs,
+    'DLSC': def_yrs,
+    'DSSC': def_yrs,
     'TS':  def_yrs,
     'CLDTOT':  def_yrs,
     'LWCF':  def_yrs,
@@ -119,6 +125,8 @@ vmaxs = {
     'OLR': 5.0,
     'DLS': 5.0,
     'DSS': 5.0,
+    'DLSC': 5.0,
+    'DSSC': 5.0,
     'LWCF': 5.0,
     'SWCF': 5.0,
     'ICEFRAC': None,
@@ -133,6 +141,8 @@ cmaps = {
     'OLR':'PiYG',
     'DLS':'PRGn_r',
     'DSS':'PRGn_r',
+    'DLSC':'PRGn_r',
+    'DSSC':'PRGn_r',
     'LWCF':'PRGn_r',#'cool',
     'SWCF':'PRGn_r',#'cool',
     #'CLDTOT':'ocean',
@@ -150,6 +160,8 @@ labls = {
     'OLR':'OLR [W/m2]',
     'DLS':'DLS [W/m2]',
     'DSS':'DSS [W/m2]',
+    'DLSC':'DLSC [W/m2]',
+    'DSSC':'DSSC [W/m2]',
     'LWCF':'LWCF [W/m2]',
     'SWCF':'SWCF [W/m2]',
     'CLDTOT':'CLD []',
@@ -182,6 +194,8 @@ if args.qbo is not None:
 
 #dTS = pert - ctrl
 dTS = xr.open_dataset(args.model+'_season_delta_ens.nc',decode_times=False)
+#only a subset of members
+#dTS = dTS.isel(member=slice(15,None))
 dTS,_,_ = fc.CorrectTime(dTS)
 end_year = '{0:04d}'.format(dTS.time[0].dt.year+9)
 dTS = dTS.sel(time=slice(None,end_year))
@@ -220,6 +234,7 @@ for f,field in enumerate(fields):
         pval = ac.StatTest(dm,0,'T','member',parallel=True)
         dmm = dm.mean('member')
         cf = dmm.where(pval<pthresh).plot(ax=ax,vmax=vmaxs[field],cmap=cmaps[field],add_colorbar=False,**transf)
+        #cf = pval.plot(ax=ax,vmax=1,cmap='viridis_r',add_colorbar=False,**transf)
         ax.gridlines()
         ax.coastlines()
         if args.boxes and field in areas.keys():

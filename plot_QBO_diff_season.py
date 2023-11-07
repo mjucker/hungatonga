@@ -8,7 +8,9 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('-m',dest='model',default='waccm',help='Choose model/run to plot.')
 parser.add_argument('--v1',dest='var1',default='Q',help='Choose the variable to be plotted as shading.')
+parser.add_argument('--s1',dest='scale1',default=None,help='Scale variable 1 by this factor for plotting.')
 parser.add_argument('--v2',dest='var2',default='psis',help='Choose the variable to be plotted as contours.')
+parser.add_argument('--s2',dest='scale2',default=None,help='Scale variable 2 by this factor for plotting.')
 parser.add_argument('-l',dest='levs',default='1,100',help='Pressure levels to plot.')
 parser.add_argument('-D',dest='diff',default='delta',help='Compute the difference between QBO phases of - anomalies [diff,default], - perturbation sims [pert] - control sims [ctrl].')
 args = parser.parse_args()
@@ -27,9 +29,30 @@ cutoff_year = 3
 vlevels = {
     'O3'  : [l for l in np.linspace(-1e-7,1e-7,21) if l !=0],
     'Q'   : [l for l in np.linspace(-1e-6,1e-6,21) if l !=0],
-    'psis': [l for l in np.linspace(-1e9 ,1e9 ,21) if l !=0],
+    'psis': [l for l in np.linspace(-1e9,1e9,21) if l !=0],
     'psi' : [l for l in np.linspace(-1e10,1e10,21) if l !=0],
     }
+
+vscales = {
+    'Q' : 1e6/0.622,
+    'psis': 1e9,
+    'psi' : 1e10,
+    }
+
+if args.scale1 is None:
+    if args.var1 in vscales.keys():
+        scale1 = vscales[args.var1]
+    else:
+        scale1 = 1
+else:
+    scale1 = args.scale1
+if args.scale2 is None:
+    if args.var2 in vscales.keys():
+        scale2 = vscales[args.var2]
+    else:
+        scale2 = 1
+else:
+    scale2 = args.scale2
 
 delta = xr.open_dataset('{0}_season_{1}_ens.nc'.format(model,show),decode_times=False)
 
@@ -64,11 +87,12 @@ delta = xr.merge(dmerge)
 lev = ac.FindCoordNames(delta)['pres']
 levs = slice(*plevs)
 dtmp = delta.sel({lev:levs})
-fg = dtmp[args.var1].where(dtmp['pval_'+args.var1]<0.1).plot(col='time',col_wrap=4,yincrease=False,yscale='log',zorder=0)
-dpsis = dtmp[args.var2].where(dtmp['pval_'+args.var2]<0.1)
+fg = (dtmp[args.var1].where(dtmp['pval_'+args.var1]<0.1)*scale1).plot(col='time',col_wrap=4,yincrease=False,yscale='log',zorder=0)
+dpsis = dtmp[args.var2].where(dtmp['pval_'+args.var2]<0.1)*scale2
 for a,ax in enumerate(fg.axs.flat):
-    dtmp[args.var2].isel(time=a).plot.contour(levels=vlevels[args.var2],ax=ax,x='lat',yincrease=False,yscale='log',zorder=2,linewidths=0.5,colors='gray')
-    dpsis.isel(time=a).plot.contour(levels=vlevels[args.var2],colors='k',ax=ax,x='lat',yincrease=False,yscale='log',zorder=3,linewidths=2)
+    levs = [l*scale2 for l in vlevels[args.var2]]
+    (dtmp[args.var2]*scale2).isel(time=a).plot.contour(levels=levs,ax=ax,x='lat',yincrease=False,yscale='log',zorder=2,linewidths=0.5,colors='gray')
+    dpsis.isel(time=a).plot.contour(levels=levs,colors='k',ax=ax,x='lat',yincrease=False,yscale='log',zorder=3,linewidths=2)
     t = dpsis.isel(time=a).time
     yr = int(t.dt.year.values)
     seas=t.dt.season.values

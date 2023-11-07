@@ -12,6 +12,7 @@ parser.add_argument('-L',dest='levels',default=None,type=float,nargs=3)
 parser.add_argument('-y',dest='years',default=None,help='average of this range of years. form startYear,stopYear')
 parser.add_argument('-s',dest='seasons',default=['DJF','MAM','JJA','SON'],nargs='+',help='only plot those seasons')
 parser.add_argument('-Y',dest='plot_years',default=None,help='Only plot these years. form startYear,stopYear')
+parser.add_argument('-C',dest='cmap',default='RdBu_r',help='Use a custom colormap')
 parser.add_argument('--qbo',dest='qbo',default=None,help='Only take ensemble members which start in given QBO phase. Either + or - if given.')
 args = parser.parse_args()
 sns.set_context('notebook')
@@ -35,6 +36,10 @@ else:
 diffs = xr.open_dataset(model+'_season_delta_ens.nc',decode_times=False)[var]#.isel(time=slice(1,None)) #
 diffs,_,_ = fc.CorrectTime(diffs.to_dataset())
 diffs = diffs[var].sel(time=yslice)
+if 'units' in diffs.attrs:
+    units = diffs.attrs['units']
+else:
+    units = None
 if args.qbo is not None:
     ds = xr.open_dataset('{0}_season_ctrl_ens.nc'.format(model),decode_times=False).isel(time=slice(1,None))
     qbo_pos,qbo_neg = fc.CheckQBO(ds,model)
@@ -74,6 +79,7 @@ else:
     fig,axs,transf = ac.Projection('PlateCarree',ncols=cwrap,nrows=nrows,kw_args={'central_longitude':155})
     years = [int(y) for y in args.years.split(',')]
     yslce = slice('{0:04d}'.format(years[0]),'{0:04d}'.format(years[1]))
+    #diffs = diffs.resample(time='QS-DEC').mean()
     diffs = diffs.sel(time=yslce).groupby('time.season').mean()
     filtrdim = 'season'
     timedim='season'
@@ -102,7 +108,7 @@ for s,season in enumerate(seasons):
                 attle = ttle
             else:
                 continue
-        cf = tmpp.plot.contourf(ax=ax,x='lon',levels=levels,extend='both',**transf)
+        cf = tmpp.plot.contourf(ax=ax,x='lon',cmap=args.cmap,levels=levels,extend='both',**transf)
         if not ax.get_subplotspec().is_last_row():
             ax.set_xlabel('')
         if not ax.get_subplotspec().is_first_col():
@@ -112,7 +118,9 @@ for s,season in enumerate(seasons):
         ax.coastlines()
     ac.AddPanelLabels(axs,'upper left',ypos=1.12) 
     if s == len(seasons)-1 or args.years is None:
-        ac.AddColorbar(fig,axs,cf)
+        cbar = ac.AddColorbar(fig,axs,cf)
+        if units is not None:
+            cbar.ax.set_ylabel(units)
         #fg.fig.suptitle(season)
         if args.years is None:
             suff = season

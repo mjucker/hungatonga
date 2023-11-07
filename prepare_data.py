@@ -13,8 +13,6 @@ parser.add_argument('-O',dest='overwrite',action='store_true',help='Overwrite ex
 parser.add_argument('-t',dest='time_limit',default=None,type=int,nargs=2,help='Limit to given range of time steps. istart istop.')
 args = parser.parse_args()
 
-if not os.path.isfile('hybrid2pressure.template.ncl'):
-    raise IOError('CANNOT PROCEED: NEED FILE hybrid2pressure.template.ncl IN WORKING DIRECTORY.')
 
 if args.time_limit is not None:
     tsel = {'time':slice(args.time_limit[0],args.time_limit[1])}
@@ -30,17 +28,20 @@ outFile2d  = args.outFile.replace('.nc','.2d.nc')
 
 #vars_3d = ['O3','Z3','Q','U','V','T','RELHUM','UU','VV','VQ','VU','VT','VTH3d','QRS','QRL','OMEGA','CLOUD','CLDICE','CLDLIQ','TH']
 vars_3d = ['O3','Z3','Q','U','V','T','TH','UV3d','VTH3d','UW3d','QRS','QRL','OMEGA','CLOUD','CLDICE','CLDLIQ']
+#vars_3d = ['QRL','QRS']
 #vars_3d = []
-#vars_3d = ['U']
 #vars_2d = ['CLDHGH','CLDLOW','CLDMED','CLDTOT','FLDS','FLDSC','FLNT','FLNTC','FSDS','FSDSC','FSNS','FSNSC','ICEFRAC','LANDFRAC','LHFLX','LWCF','OCNFRAC','PBLH','PHIS','PRECC','PRECL','PRECSC','PRECSL','PSL','SHFLX','SWCF','TMQ','TROPP_FD','TS','TSMN','TSMX','TREFHT',]
 #vars_2d = ['CLDTOT','CLDHGH','CLDLOW','CLDMED','FLNT','LANDFRAC','PHIS','PRECC','PRECL','PRECSC','PRECSL','PSL','TMQ','TROPP_FD','TS','TSMN','TSMX','TREFHT','U10','V10','FLDS','FSDS','LWCF','SWCF','ICEFRAC']
 vars_2d = ['CLDTOT','FLNT','LANDFRAC','PHIS','PRECC','PRECL','PRECSC','PRECSL','PSL','TMQ','TROPP_FD','TS','TSMN','TSMX','TREFHT','U10','V10','FLDS','FSDS','FLDSC','FSDSC','LWCF','SWCF','ICEFRAC']
 #vars_2d = ['FSDSC','FLDSC']
+#vars_2d = []
 
 ## for MiMA input
 #vars_3d = ['O3','Q','U','V','T','Z3']
 #vars_2d = ['TS','PHIS']
 
+if len(vars_3d)>0 and not os.path.isfile('hybrid2pressure.template.ncl'):
+    raise IOError('CANNOT PROCEED: NEED FILE hybrid2pressure.template.ncl IN WORKING DIRECTORY.')
 
 def WriteFile(ds,name,enc=None):
     from dask.diagnostics import ProgressBar
@@ -136,11 +137,12 @@ if len(vars_3d) > 0:
     for f,field in enumerate(vars[1:]):
         bash_script.write('echo "{0}.nc: {1}/{2}"\n'.format(field,f+1,nvars))
         bash_script.write('ncks -A {0}.nc {1}\n'.format(field,args.outFile))
-    bash_script.write('echo "ADDING 2D FIELDS"\n')
-    bash_script.write('ncks -A {0} {1}\n'.format(outFile2d,args.outFile))
+    if len(vars_2d) > 0:
+        bash_script.write('echo "ADDING 2D FIELDS"\n')
+        bash_script.write('ncks -A {0} {1}\n'.format(outFile2d,args.outFile))
     bash_script.write('echo "DONE. NOW YOU MIGHT WANT TO CLEAN UP TEMPORARY FILES WITH cleanup.sh"\n')
     bash_script.close()
-else:
+elif len(vars_2d) > 0:
     bash_script = open('prepare_data.sh','w')
     bash_script.write('#!/bin/bash\n')
     bash_script.write('module load nco\n')
@@ -152,15 +154,20 @@ else:
 # finally, create a bash script to clean up intermediate files
 clean_script = open('cleanup.sh','w')
 clean_script.write('#!/bin/bash\n')
-clean_script.write('rm {0}\n'.format(outFile2d))
+if len(vars_2d) > 0:
+    clean_script.write('rm {0}\n'.format(outFile2d))
 if len(vars_3d)>0:
-    field_string = '{'+','.join(vars[1:])+'}'
-    clean_script.write('rm {0}.nc\n'.format(field_string))
+    if len(vars_3d) > 1:
+        if len(vars_3d) > 2:
+            field_string = '{'+','.join(vars[1:])+'}'
+        else:
+            field_string = vars[1]
+        clean_script.write('rm {0}.nc\n'.format(field_string))
     clean_script.write('rm {0}\n'.format(outFile3d))
     clean_script.write('rm data3.nc\n'.format(outFile3d))
     for script in scripts:
         clean_script.write('rm {0}\n'.format(script))
-    clean_script.write('rm level_grid.nc')
+    clean_script.write('rm level_grid.nc\n')
 clean_script.write('rm prepare_data.sh cleanup.sh\n'.format(outFile3d))
 clean_script.write('echo "DONE."\n')
 clean_script.close()

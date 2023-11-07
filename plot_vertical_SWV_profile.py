@@ -5,6 +5,7 @@ import seaborn as sns
 from aostools import climate as ac
 from hungatonga import functions as fc
 from matplotlib import pyplot as plt
+from matplotlib import ticker
 sns.set_context('talk')
 sns.set_style('whitegrid')
 colrs = sns.color_palette()
@@ -28,6 +29,9 @@ pprof.sel(pfull=slice(100,None)).plot(y='pfull',ax=ax)
 
 ax.set_ylim(1,100)
 ac.LogPlot(ax)
+ticks = ticker.FixedLocator(list(np.arange(1,10))+list(np.arange(10,100,10)))
+ax.yaxis.set_minor_locator(ticks)
+ax.yaxis.grid(True,which='minor')
 sns.despine()
 ax.set_xlim(0,0.25)
 

@@ -87,18 +87,28 @@ print(outFile)
 
 
 # now start working with the actual data
-pert = xr.open_dataset('{0}_pert_ens.nc'.format(model),decode_times=False)
-ctrl = xr.open_dataset('{0}_ctrl_ens.nc'.format(model),decode_times=False)
+#pert = xr.open_dataset('{0}_pert_ens.nc'.format(model),decode_times=False)
+#ctrl = xr.open_dataset('{0}_ctrl_ens.nc'.format(model),decode_times=False)
 
-CT,_,_ = fc.CorrectTime(ctrl)
+#CT,units,cal = fc.CorrectTime(ctrl,decode=False)
 
-dTS = pert - ctrl
-dTS,_,_ = fc.CorrectTime(dTS)
+dTS = xr.open_dataset('{0}_delta_ens.nc'.format(model),decode_times=False)
+dTS,units,cal = fc.CorrectTime(dTS,decode=False)
+tunits = units.split(' ')[0]
+if tunits == 'days':
+    if cal == 'noleap':
+        dTS = dTS.assign_coords({'time':dTS.time/365})
+    else:
+        dTS = dTS.assign_coords({'time':dTS.time/360})
+dTS.time.attrs['units'] = units.replace('days','years')
+tmax = np.ceil(dTS.time.values[-1])
 
 # analyze monthly timeseries
 for s,roll in enumerate(rolls):
     for f,field in enumerate(fields):
         axs = []
+        ymin = np.inf
+        ymax =-np.inf
         nreg = len(areas[field].keys())
         ncols = 2
         nrows = (nreg)//ncols
@@ -110,18 +120,28 @@ for s,roll in enumerate(rolls):
             if var in var_fields.keys():
                 var = var_fields[var]
             da = dTS[var]*scales[field]
-            dc = CT[var]*scales[field]
-            tmp = da.sel(areas[field][reg]).mean(['lon','lat'])
+            #dc = CT[var]*scales[field]
+            tmp = ac.GlobalAvgXr(da.sel(areas[field][reg]).mean('lon'))
             tmp = tmp.rolling(time=roll).mean()
-            std = dc.sel(areas[field][reg]).mean(['lon','lat']).rolling(time=roll).mean().std('member')
-            tmp = tmp/std
+            #std = dc.sel(areas[field][reg]).mean(['lon','lat']).rolling(time=roll).mean().std('member')
+            #tmp = tmp/std
             tmp.plot.line(x='time',color=colrs[r],alpha=0.1,add_legend=False,ax=ax)
             tmp.mean('member').plot.line(ax=ax,color=colrs[r],lw=1,ls='--',add_legend=False)
             pval = ac.StatTest(tmp,0,'T','member')
             tmp.mean('member').where(pval<0.1).plot.line(ax=ax,color=colrs[r],lw=2,add_legend=False)
             ax.set_title(reg)
+            ax.set_ylabel('')
             if r < 2:
                 ax.set_xlabel('')
+                ax.set_xticklabels([])
+            else:
+                ax.set_xlabel('years since eruption')
+            ax.set_xlim(0,tmax)
+            ylims = ax.get_ylim()
+            ymax = max(ymax,ylims[1])
+            ymin = min(ymin,ylims[0])
+        for ax in axs:
+            ax.set_ylim(ymin,ymax)
         fig.suptitle('{0}, {1}-month rolling mean'.format(labls[field],roll))
         ac.AddPanelLabels(axs,'upper left',ypos=1.1) 
         outFile = 'figures/{0}_{1}_roll{2}_lines_regions.pdf'.format(model,field,roll)
@@ -130,9 +150,7 @@ for s,roll in enumerate(rolls):
 
 # now do the same thing by season
 sTS = xr.open_dataset('waccm_season_delta_ens.nc')
-sCT = xr.open_dataset('waccm_season_ctrl_ens.nc')
-#sTS = dTS.resample(time='QS-DEC').mean()
-#sCT = CT.resample(time='QS-DEC').mean()
+#sCT = xr.open_dataset('waccm_season_ctrl_ens.nc')
 
 seasons = np.unique(sTS.time.dt.season)
 # plot per variable per roll per region, 1 panel for each season
@@ -141,7 +159,7 @@ for f,field in enumerate(fields):
     if var in var_fields.keys():
         var = var_fields[var]
     da = sTS[var]*scales[field]
-    dc = sCT[var]*scales[field]
+    #dc = sCT[var]*scales[field]
     for a,roll in enumerate(yrolls):
         for r,reg in enumerate(areas[field].keys()):
             axs = []
@@ -154,9 +172,9 @@ for f,field in enumerate(fields):
                 filtr = sTS[var].time.dt.season == seas
                 tmp = da.sel(areas[field][reg]).mean(['lon','lat']).isel(time=filtr)
                 tmp = tmp.rolling(time=roll).mean()
-                std = dc.sel(areas[field][reg]).mean(['lon','lat']).isel(time=filtr)
-                std = std.rolling(time=roll).mean().std('member')
-                tmp = tmp/std
+                #std = dc.sel(areas[field][reg]).mean(['lon','lat']).isel(time=filtr)
+                #std = std.rolling(time=roll).mean().std('member')
+                #tmp = tmp/std
                 tmp.plot.line(x='time',color=colrs[r],alpha=0.1,add_legend=False,ax=ax)
                 tmp.mean('member').plot.line(ax=ax,color=colrs[r],lw=1,ls='--',add_legend=False)
                 pval = ac.StatTest(tmp,0,'T','member')
