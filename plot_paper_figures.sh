@@ -33,6 +33,10 @@ python $repdir/hungatonga/plot_maps.py -m waccm --center 155 -v DLS CLDTOT LWCF 
 python $repdir/hungatonga/plot_ipv_waf.py -m waccm -s DJF JJA -y 3,7
 # Figure B2
 python $repdir/hungatonga/plot_lines_regions.py -m waccm -v TS
+python $repdir/hungatonga/plot_zm_season.py -m waccm -s DJF JJA -y 3,7 -v T -L -0.5 0.5 26
+python $repdir/hungatonga/plot_zm_season.py -m waccm -s DJF JJA -y 3,7 -v U
+# global mean temperature anomalies
+python $repdir/hungatonga/compute_global_mean_temperature.py -m waccm
 
 cd ../mima
 python $repdir/hungatonga/plot_maps.py -m bench_SH_fix_125Tg --center 155 -v TS P -b
@@ -40,7 +44,7 @@ python $repdir/hungatonga/plot_plevel_season.py -m bench_SH_fix_125Tg -v CFSD -l
 python $repdir/hungatonga/plot_maps.py -m bench_SH_fixq_o3init_125Tg --center 155 -v TS P -b
 python $repdir/hungatonga/plot_maps.py -m bench_SH_fixo3_qinit_125Tg --center 155 -v TS P -b
 python $repdir/hungatonga/plot_plevel_season.py -m bench_SH_fix_125Tg -v V -l 300 -L -3 3 16 -y 3,7
-python $repdir/hungatonga/plot_zm_season.py -m waccm -s DJF JJA -y 3,7 -v T -L -0.5 0.5 26
-python $repdir/hungatonga/plot_zm_season.py -m waccm -s DJF JJA -y 3,7 -v U
+# global mean temperature anomalies
+python $repdir/hungatonga/compute_global_mean_temperature.py -m bench_SH_fix_125Tg
 
 
