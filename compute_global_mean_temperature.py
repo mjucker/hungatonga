@@ -20,10 +20,10 @@ ds,_,_ = fc.CorrectTime(du)
 years = [int(y) for y in args.years.split(',')]
 yslce = slice('{0:04d}'.format(years[0]),'{0:04d}'.format(years[1]))
 
-if 'TS' in ds.data_vars:
-    var = 'TS'
-else:
-    var = fc.variables[qmodel]['TS']
+#if 'TS' in ds.data_vars:
+#    var = 'TS'
+#else:
+var = fc.variables[qmodel]['TS']
 
 tg = ac.GlobalAvgXr(ds[var].mean('lon'))
 th = ac.GlobalAvgXr(du[var].mean('lon'))
