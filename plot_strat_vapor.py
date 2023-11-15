@@ -2,6 +2,7 @@
 
 import xarray as xr
 from aostools import climate as ac
+from aostools import constants as at
 import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
@@ -13,6 +14,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-m',dest='model',default='waccm',help='Choose model/run to plot.')
 parser.add_argument('--qbo',dest='qbo',default=None,help='Only take ensemble members which start in given QBO phase. Either + or - if given.')
 parser.add_argument('--qmodel',dest='qbo_model',default=None,help='Use this model to assess QBO phase.')
+parser.add_argument('-L',dest='level',default=None,help='Plot integrated water vapor [None], water vapor at 100hPa [100] or 200hPa [200]')
 args = parser.parse_args()
 model = args.model
 qnme = {'+':'QBOW','-':'QBOE'}
@@ -22,6 +24,10 @@ do_daily = False
 
 sns.set_context('notebook')
 sns.set_style('whitegrid')
+colrs = sns.color_palette('bright')
+
+mls_levels = {'100':'100','200':'215'}
+
 
 def ReadFile(file):
     ds = xr.open_dataset(file,decode_times=False)
@@ -57,10 +63,13 @@ if args.qbo is not None:
     elif args.qbo == '-':
         pert = pert.isel(member=qbo_neg)
         ctrl = ctrl.isel(member=qbo_neg)
-if model.lower() == 'waccm':
-    levslice = {lev:slice(1,100)}
+if args.level is None:
+    if model.lower() == 'waccm':
+        levslice = {lev:slice(1,100)}
+    else:
+        levslice = {lev:slice(100,1)}
 else:
-    levslice = {lev:slice(100,1)}
+    levslice = {lev:int(args.level)}
 pert = pert.sel(levslice)
 ctrl = ctrl.sel(levslice)
 if not 'CLDICE' in pert.data_vars:
@@ -85,7 +94,6 @@ def MassPerDeg(ds):
         mass = -mass
     return mass
 
-
 def PlotMass(mass,tco=None,appendix='',levels=20,colr=None,fig_out=False,kind='auto',fig=None,ax=None):
     #fig,ax = plt.subplots()
     if fig is None:
@@ -100,6 +108,7 @@ def PlotMass(mass,tco=None,appendix='',levels=20,colr=None,fig_out=False,kind='a
             cmass = mass.CLDICE
     else:
         qmass = mass
+    units = qmass.attrs['units']
     if 'member' in qmass.coords:
         pval = ac.StatTest(qmass,0,'T','member',parallel=True)
         pmass = qmass.mean('member').where(pval<0.1)
@@ -118,7 +127,7 @@ def PlotMass(mass,tco=None,appendix='',levels=20,colr=None,fig_out=False,kind='a
     if kind == 'auto':
         cf = pmass.plot.contourf(ax=ax,levels=levels,x='time',robust=True,zorder=1,cmap=cmap,add_colorbar=False)#,cbar_kwargs={'label':'Q [mg/m2]','shrink':0.8},cmap=cmap)#,cmap='PuOr')
         position = fig.add_axes([0.85,0.12,0.02,0.35])
-        fig.colorbar(cf,ax=ax,cax=position,label='Q [mg/m2]')
+        fig.colorbar(cf,ax=ax,cax=position,label='Q [{0}]'.format(units))
         if cmass is not None:
             cf = cmass.plot.contourf(ax=ax,levels=np.linspace(0,50,11),x='time',robust=True,zorder=2,add_colorbar=False,cmap=ccmap)#,cbar_kwargs={'format':'%4.1f','label':'CLDICE [mg/m2]','shrink':0.5,'anchor':(0,0.75)})
             position = fig.add_axes([0.85,0.5,0.02,0.35])
@@ -126,12 +135,12 @@ def PlotMass(mass,tco=None,appendix='',levels=20,colr=None,fig_out=False,kind='a
     elif kind == 'contour':
         if colr is None:
             colr = 'k'
-        pmass.plot.contour(ax=ax,levels=levels,x='time',colors=colr,zorder=1,add_colorbar=False)#,cmap='PuOr')
+        pmass.plot.contour(ax=ax,levels=levels,x='time',colors=[colr],zorder=1,add_colorbar=False)#,cmap='PuOr')
     ttle = 'Water vapor mass'
     outFile = 'figures/tQ'
     if tco is not None:
         pval = ac.StatTest(tco,0,'T','member',parallel=True)
-        tco.mean('member').plot.contour(ax=ax,levels=[-10,-5],colors='k',x='time',zorder=2,linestyles='dashed')
+        tco.mean('member').plot.contour(ax=ax,levels=[-10,-5],colors='k',x='time',zorder=1,alpha=1.0,linestyles='dashed')
         tco.mean('member').where(pval<0.1).plot.contour(ax=ax,levels=[-10,-5],colors='k',x='time',zorder=3,linestyles='solid')
         ttle = ttle+', TCO anomalies'
         outFile = outFile+'_dTCO'
@@ -153,27 +162,37 @@ def PlotMass(mass,tco=None,appendix='',levels=20,colr=None,fig_out=False,kind='a
         fc.SaveFig(fig,outFile)
 
 
-
-delta = fc.Mass(pert-ctrl)*1e3
+if args.level is None:
+    delta = fc.Mass(pert-ctrl)*1e6
+    units = 'mg/m2'
+    mls_var = 'anom_hm'
+    clevs = [250,500,750,1000]
+else:
+    delta = (pert-ctrl)*1e6*at.Rv/at.Rd #ppmv
+    units = 'ppmv'
+    mls_var = 'q{0}_hm'.format(mls_levels[args.level])
+    clevs = 20 #[250,500,750,1000]
 #delta = delta.mean('member')
 if isinstance(delta,xr.Dataset):
     for var in delta.data_vars:
-        delta[var].attrs['units'] = 'mg/m2'
+        delta[var].attrs['units'] = units
 else:
-    delta.attrs['units'] = 'g/m2'
+    delta.attrs['units'] = units
 if do_daily:
-    delta_d = fc.Mass(pert_d)*1e3
+    delta_d = fc.Mass(pert_d)*1e6
     delta_d = delta_d.mean('member')
-    delta_d.attrs['units'] = 'g/m2'
+    delta_d.attrs['units'] = units
 
-levs = [2,4,6,8,10]
 
-mls = fc.ReadMLS(True).sel(time=slice('0001-01-01',None))
-anom_hm = mls.anom_hm.resample(time='1M',label='left',loffset='14D').mean()
+mls = fc.ReadMLS(True,args.level).sel(time=slice('0001-01-01',None))
+anom_hm = mls[mls_var].resample(time='1M',label='left',loffset='14D').mean()
 anom_hm = fc.ConvertTime2Years(anom_hm)
+if args.level is None:
+    anom_hm = anom_hm*1e3 #mls data is in g/m2 for integrated wv, and ppmv else
+anom_hm.attrs['units'] = units
 
 ## Ozone
-if model.lower() == 'waccm':
+if model.lower() == 'waccm' and args.level is None:
     dTCO = ReadFile(pert_file).TCO - ReadFile(ctrl_file).TCO
     dTCO = dTCO.mean('lon')
 else:
@@ -184,12 +203,16 @@ if args.qbo is not None and dTCO is not None:
     elif args.qbo == '-':
         dTCO = dTCO.isel(member=qbo_neg)
 
-fig,ax = PlotMass(delta.mean('lon')*1e3,dTCO,'_'+model.upper(),fig_out = True)
-PlotMass(anom_hm,None,'_{0}_MLS'.format(model.upper()),kind='contour',colr='cyan',levels=[.25,.5,.75,1],fig=fig,ax=ax)
+fig,ax = PlotMass(delta.mean('lon',keep_attrs=True),dTCO,'_'+model.upper(),fig_out = True)
+appendix = '_{0}_MLS'
+if args.level is not None:
+    appendix = appendix + '_{0}hPa'.format(args.level)
+PlotMass(anom_hm,None,appendix.format(model.upper()),kind='contour',colr=colrs[2],levels=clevs,fig=fig,ax=ax)
 
 #delta = delta.mean('member')
 
 # 2D early daily evolution
+levs = [2,4,6,8,10]
 if do_daily:
     mls = fc.ReadMLSMap()
     mls = ac.CloseGlobe(mls)

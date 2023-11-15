@@ -145,10 +145,14 @@ def ConvertTime2Years(ds):
     return ds.assign_coords(time=fyr)
 
 
-def ReadMLS(pure_anom=False):
-    mls  = xr.open_dataset('MLS_data.nc')
+def ReadMLS(pure_anom=False,level=None):
+    if level is None:
+        datafile = 'MLS_data.nc'
+    else:
+        datafile = 'MLS_data_lev.nc'
+    mls  = xr.open_dataset(datafile)
     #mls = mls.assign_coords({'TS_Time':mls.ts_Time,'ZM_Lat':mls.zm_lat})
-    if 'ts_Time' in mls.coords:
+    if 'ts_Time' in mls.coords or 'ts_Time' in mls.data_vars:
         mls = mls.rename({'ts_Time':'TS_Time'})
     if 'zm_lat' in mls.data_vars:
         mls = mls.rename({'zm_lat':'ZM_Lat'})
