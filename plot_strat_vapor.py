@@ -94,7 +94,7 @@ def MassPerDeg(ds):
         mass = -mass
     return mass
 
-def PlotMass(mass,tco=None,appendix='',levels=20,colr=None,fig_out=False,kind='auto',fig=None,ax=None):
+def PlotMass(mass,tco=None,appendix='',levels=20,colr=None,fig_out=False,kind='auto',fig=None,ax=None,do_pval=True):
     #fig,ax = plt.subplots()
     if fig is None:
         fig = plt.figure()
@@ -110,7 +110,10 @@ def PlotMass(mass,tco=None,appendix='',levels=20,colr=None,fig_out=False,kind='a
         qmass = mass
     units = qmass.attrs['units']
     if 'member' in qmass.coords:
-        pval = ac.StatTest(qmass,0,'T','member',parallel=True)
+        if do_pval:
+            pval = ac.StatTest(qmass,0,'T','member',parallel=True)
+        else:
+            pval = xr.zeros_like(qmass.mean('member'))
         pmass = qmass.mean('member').where(pval<0.1)
         smass = qmass.mean('member')
     else:
@@ -135,7 +138,7 @@ def PlotMass(mass,tco=None,appendix='',levels=20,colr=None,fig_out=False,kind='a
     elif kind == 'contour':
         if colr is None:
             colr = 'k'
-        pmass.plot.contour(ax=ax,levels=levels,x='time',colors=[colr],zorder=1,add_colorbar=False)#,cmap='PuOr')
+        pmass.plot.contour(ax=ax,levels=levels,x='time',colors=[colr],negative_linestyles='dashed',zorder=1,add_colorbar=False)#,cmap='PuOr')
     ttle = 'Water vapor mass'
     outFile = 'figures/tQ'
     if tco is not None:
@@ -154,6 +157,8 @@ def PlotMass(mass,tco=None,appendix='',levels=20,colr=None,fig_out=False,kind='a
     #ax = plt.gca()
     ax.set_title(ttle)
     ax.set_xlabel('time [years since eruption]')
+    xlims = ax.get_xlim()
+    ax.set_xlim(0,xlims[1])
     ax.grid(True,zorder=5)
     #ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
     if fig_out:
@@ -167,11 +172,17 @@ if args.level is None:
     units = 'mg/m2'
     mls_var = 'anom_hm'
     clevs = [250,500,750,1000]
+    do_pval = True
 else:
     delta = (pert-ctrl)*1e6*at.Rv/at.Rd #ppmv
     units = 'ppmv'
     mls_var = 'q{0}_hm'.format(mls_levels[args.level])
-    clevs = 20 #[250,500,750,1000]
+    if args.level == '100':
+        clevs = [0.5,1.0,1.5,2.0] #[250,500,750,1000]
+    elif args.level == '200':
+        clevs = [5,10,20,50]
+    #clevs = [-l for l in clevs[::-1]]+clevs
+    do_pval = False
 #delta = delta.mean('member')
 if isinstance(delta,xr.Dataset):
     for var in delta.data_vars:
@@ -189,6 +200,9 @@ anom_hm = mls[mls_var].resample(time='1M',label='left',loffset='14D').mean()
 anom_hm = fc.ConvertTime2Years(anom_hm)
 if args.level is None:
     anom_hm = anom_hm*1e3 #mls data is in g/m2 for integrated wv, and ppmv else
+else:
+    anom_hm = anom_hm*1e6 #mls data is in ppmv
+    delta = delta.sel(time=slice(None,anom_hm.time[-1]))
 anom_hm.attrs['units'] = units
 
 ## Ozone
@@ -203,7 +217,7 @@ if args.qbo is not None and dTCO is not None:
     elif args.qbo == '-':
         dTCO = dTCO.isel(member=qbo_neg)
 
-fig,ax = PlotMass(delta.mean('lon',keep_attrs=True),dTCO,'_'+model.upper(),fig_out = True)
+fig,ax = PlotMass(delta.mean('lon',keep_attrs=True),dTCO,'_'+model.upper(),fig_out = True,do_pval=do_pval)
 appendix = '_{0}_MLS'
 if args.level is not None:
     appendix = appendix + '_{0}hPa'.format(args.level)
