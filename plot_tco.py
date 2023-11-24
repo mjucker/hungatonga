@@ -74,7 +74,7 @@ with sns.axes_style('whitegrid'):
 import pandas as pd
 max_diff = {}
 max_ctrl = {}
-months = {'SH':[9,14],'NH':[1,4]}
+months = {'SH':[12,12],'NH':[1,4]}
 month_names = {}
 for key in hemispheres:
     tf = months[key]
@@ -90,7 +90,7 @@ for key in hemispheres:
         oh_pert[key] = oh_pert[key].shift(time=shift)
         oh_ctrl[key] = oh_ctrl[key].shift(time=shift)
         tf = [t+shift for t in tf]
-    filtr = (oh_pert[key]['time.month'] >= months[key][0])*(oh_pert[key]['time.month'] <= months[key][1])
+    filtr = (oh_pert[key]['time.month'] >= tf[0])*(oh_pert[key]['time.month'] <= tf[1])
     max_diff[key] = (oh_pert[key]-oh_ctrl[key]).isel(time=filtr)
     if option == 'area':
         if operation == 'mean':
@@ -113,7 +113,10 @@ years = []
 vals = []
 hemi = []
 for hem in max_diff.keys():
-    hem_nme = '{0} {1}-{2}'.format(hem,*month_names[hem])
+    if month_names[hem][0] == month_names[hem][1]:
+        hem_nme = '{0} {1}'.format(hem,month_names[hem][0])
+    else:
+        hem_nme = '{0} {1}-{2}'.format(hem,*month_names[hem])
     for m in range(len(max_diff[hem].member)):
         for y in range(len(max_diff[hem].year)):
             hemi.append(hem_nme)

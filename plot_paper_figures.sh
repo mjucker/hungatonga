@@ -8,18 +8,20 @@ cd $arch/work/HungaTonga/
 # Figure 1 
 python $repidr/hungatonga/plot_vertical_SWV_profile.py
 
-
 cd $arch/work/HungaTonga/analysis/125Tg/waccm/
 
 # Figure 2
 python $repdir/hungatonga/plot_q.py --qbo a
 # Figure 3
 python $repdir/hungatonga/plot_QBO_diff_season.py -m waccm --v1 Q --v2 psis
-
+# Figure 5ab
 python $repdir/hungatonga/plot_tco.py --years 1,4 --ylim -1 4 --qbo -
 python $repdir/hungatonga/plot_tco.py --years 1,4 --ylim -1 4 --qbo +
+# Figure 5cd
 python $repdir/hungatonga/plot_strat_vapor.py -m waccm --qbo -
 python $repdir/hungatonga/plot_strat_vapor.py -m waccm --qbo +
+# additional figure to compare MLS and WACCM 2023-10
+python $repdir/hungatonga/plot_strat_vapor.py -m waccm --qbo - -L 0001-10
 python $repdir/hungatonga/plot_plevel_season.py -m waccm -v U -l 300 -L -4 4 17 -s DJF -Y 1,4 --qbo -
 python $repdir/hungatonga/plot_plevel_season.py -m waccm -v U -l 300 -L -4 4 17 -s DJF -Y 1,4 --qbo +
 python $repdir/hungatonga/plot_plevel_season.py -m waccm -v U -l 300 -L -4 4 17 -s DJF JJA -y 3,7
