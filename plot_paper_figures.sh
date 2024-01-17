@@ -21,7 +21,10 @@ python $repdir/hungatonga/plot_tco.py --years 1,4 --ylim -1 4 --qbo +
 python $repdir/hungatonga/plot_strat_vapor.py -m waccm --qbo -
 python $repdir/hungatonga/plot_strat_vapor.py -m waccm --qbo +
 # additional figure to compare MLS and WACCM 2023-10
+python $repdir/hungatonga/plot_strat_vapor.py -m waccm --qbo - -L 0001-12
 python $repdir/hungatonga/plot_strat_vapor.py -m waccm --qbo - -L 0001-10
+
+
 python $repdir/hungatonga/plot_plevel_season.py -m waccm -v U -l 300 -L -4 4 17 -s DJF -Y 1,4 --qbo -
 python $repdir/hungatonga/plot_plevel_season.py -m waccm -v U -l 300 -L -4 4 17 -s DJF -Y 1,4 --qbo +
 python $repdir/hungatonga/plot_plevel_season.py -m waccm -v U -l 300 -L -4 4 17 -s DJF JJA -y 3,7
@@ -30,16 +33,21 @@ python $repdir/hungatonga/plot_plevel_season.py -m waccm -v Z -l 300 -L -80 80 1
 # Figures 7,8
 python $repdir/hungatonga/plot_maps.py -m waccm --center 155 -v TS P
 # Figure 9
-python $repdir/hungatonga/plot_maps.py -m waccm --center 155 -v DLS CLDTOT LWCF SWCF
+python $repdir/hungatonga/plot_maps.py -m waccm --center 155 -v DLS CLDTOT TCWV LWCF SWCF
 # Figure 10
 python $repdir/hungatonga/plot_ipv_waf.py -m waccm -s DJF JJA -y 3,7
 # Figure B2
 python $repdir/hungatonga/plot_lines_regions.py -m waccm -v TS
 python $repdir/hungatonga/plot_zm_season.py -m waccm -s DJF JJA -y 3,7 -v T -L -0.5 0.5 26
 python $repdir/hungatonga/plot_zm_season.py -m waccm -s DJF JJA -y 3,7 -v U
-# global mean temperature anomalies
+# extra figure: global mean temperature anomalies
 python $repdir/hungatonga/compute_global_mean_temperature.py -m waccm
+# extra figure: bootstrapped means
+python $repdir/hungatonga/bootstrap_members.py -m waccm -v TS
+python $repdir/hungatonga/bootstrap_members.py -m waccm -v P
 
+
+## MiMA plots
 cd ../mima
 python $repdir/hungatonga/plot_maps.py -m bench_SH_fix_125Tg --center 155 -v TS P -b
 python $repdir/hungatonga/plot_plevel_season.py -m bench_SH_fix_125Tg -v CFSD -l 200 -y 3,7 -s DJF JJA -C PRGn_r -L -0.6 0.6 10

@@ -34,10 +34,10 @@ else:
 
 trans_fields = {'TS':'TREFHT'}
 
-scales = {'TS': 1, 'OLR': 1, 'DLS': 1, 'DLSC': 1, 'CLDTOT': 1, 'LWCF': 1, 'SWCF': 1, 'ICEFRAC': 1,'DSS': 1, 'DSSC': 1}
-for var in fields:
-    if 'CLD' in var:
-        scales[var] = scales['CLDTOT']
+scales = {}#{'TS': 1, 'OLR': 1, 'DLS': 1, 'DLSC': 1, 'CLDTOT': 1, 'LWCF': 1, 'SWCF': 1, 'ICEFRAC': 1,'DSS': 1, 'DSSC': 1}
+#for var in fields:
+#    if 'CLD' in var:
+#        scales[var] = scales['CLDTOT']
 
 if 'waccm' in model:
     scales['P'] = 1e3*86400
@@ -45,6 +45,10 @@ if 'waccm' in model:
 else:
     scales['P'] = 86400
     scales['SLP'] = 1
+
+for var in fields:
+    if var not in scales.keys():
+        scales[var] = 1
 
 default_seasons = ['DJF','MAM','JJA','SON']
 seasons = {
@@ -58,6 +62,7 @@ seasons = {
     'CLDTOT':['DJF','JJA'],
     'LWCF'  :['DJF','JJA'],
     'SWCF'  :['DJF','JJA'],
+    'TCWV'  :['DJF','JJA'],
     'SLP'   :default_seasons,
 #    'SLP'   :[1,7],
     'ICEFRAC':default_seasons,
@@ -90,6 +95,7 @@ loncents = {
     'CLDTOT':155,#cent_def,
     'SLP':cent_def,
     'ICEFRAC':cent_def,
+    'TCWV':155,
 }
 if args.center_overwrite is not None:
     for key in loncents.keys():
@@ -116,6 +122,8 @@ avg_years = {
 for var in fields:
     if 'CLD' in var:
         avg_years[var] = avg_years['CLDTOT']
+    if var not in avg_years.keys():
+        avg_years[var]= def_yrs
 
 vmaxs = {
     'TS': 1.5,
@@ -129,6 +137,7 @@ vmaxs = {
     'DSSC': 5.0,
     'LWCF': 5.0,
     'SWCF': 5.0,
+    'TCWV':None,
     'ICEFRAC': None,
     }
 for var in fields:
@@ -149,6 +158,7 @@ cmaps = {
     'CLDTOT':'cividis',
     'SLP':'BrBG_r',
     'ICEFRAC':'cubehelix',
+    'TCWV':'PuOr',
     }
 for var in fields:
     if 'CLD' in var:
@@ -167,6 +177,7 @@ labls = {
     'CLDTOT':'CLD []',
     'SLP':'SLP [hPa]',
     'ICEFRAC':'[]',
+    'TCWV': 'TCWV [kg/m2]',
     }
 for var in fields:
     if 'CLD' in var:

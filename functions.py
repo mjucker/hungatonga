@@ -145,27 +145,45 @@ def ConvertTime2Years(ds):
     return ds.assign_coords(time=fyr)
 
 
-def ReadMLS(pure_anom=False,level=None):
+def ReadMLS(pure_anom=False,level=None,adjust_time=True):
     if level is None:
         datafile = 'MLS_data.nc'
     else:
-        datafile = 'MLS_data_lev.nc'
+        datafile = 'MLS_data_h2o.nc'
     mls  = xr.open_dataset(datafile)
     #mls = mls.assign_coords({'TS_Time':mls.ts_Time,'ZM_Lat':mls.zm_lat})
     if 'ts_Time' in mls.coords or 'ts_Time' in mls.data_vars:
         mls = mls.rename({'ts_Time':'TS_Time'})
+    if 'Clim_Time' in mls.dims:
+        mls = mls.rename({'clim_time':'Clim_Time'}).rename({'Clim_Time':'month'})
     if 'zm_lat' in mls.data_vars:
         mls = mls.rename({'zm_lat':'ZM_Lat'})
+    if 'pres' in mls.data_vars:
+        mls = mls.rename({'pres':'Pres'})
     mls = mls.rename({'TS_Time':'time','ZM_Lat':'lat'})
+    mls = mls.set_coords(mls.dims)
+    if level is not None:
+        mls = mls.rename({'Pres':'pres'})
+        if not '-' in level:
+            mls = mls.set_xindex('pres')
+            mls = mls.sel(pres=float(level),method='nearest')
     # align real eruption (max around Jan 25) with WACCM sims (Jan 1)
-    mls.time.attrs['units'] = 'days since 0000-10-05'
-    mls.time.attrs['calendar'] = 'noleap'
+    if adjust_time:
+        mls.time.attrs['units'] = 'days since 0000-10-05'
+        mls.time.attrs['calendar'] = 'noleap'
+    else:
+        mls.time.attrs['units'] = 'days since 2021-11-01'
     mls = xr.decode_cf(mls)
+    for var in mls.data_vars:
+        if '_clim' in var:
+            mls[var] = mls[var].where(mls[var]>0.0)
     if pure_anom:
         base = mls.sel(time='0000-12-19').mean('time')
-        return mls - base
-    else:
-        return mls
+        mls = mls - base
+    if level is not None and '-' in level:
+        mls = mls.sel(time=level).mean('time')
+        mls = mls.sel(month=int(level.split('-')[1]))
+    return mls
 
 def ReadMLSMap():
     mls = xr.open_dataset('MLS_data.nc')
@@ -322,7 +340,7 @@ areas['TS'] = {'DJF':{
          #'EAsia':   {'lon':slice(100,125),'lat':slice(40,55)},
          #'Australia':{'lon':slice(115,155),'lat':slice(-38,-20)}
          }
-for var in ['CLDTOT','DLS','DLSC','DSSC','OLR','LWCF','SWCF']:
+for var in ['CLDTOT','DLS','DLSC','DSSC','OLR','LWCF','SWCF','TCWV']:
     areas[var] = areas['TS']
 
 def ComputeRadiativeFlux(HR,FRT,level):

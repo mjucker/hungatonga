@@ -14,7 +14,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-m',dest='model',default='waccm',help='Choose model/run to plot.')
 parser.add_argument('--qbo',dest='qbo',default=None,help='Only take ensemble members which start in given QBO phase. Either + or - if given.')
 parser.add_argument('--qmodel',dest='qbo_model',default=None,help='Use this model to assess QBO phase.')
-parser.add_argument('-L',dest='level',default=None,help='Plot integrated water vapor [None], water vapor at 100hPa [100] or 200hPa [200]')
+parser.add_argument('-L',dest='level',default=None,help='Plot integrated water vapor [None], water vapor at a given level [level in hPa], or zonal mean of a given month [YYYY-MM], where YYYY is in MLS time, starting with 0001.')
+parser.add_argument('-c',dest='contours',default=None,nargs=2,type=float,help='Force contour limits to these two numbers. Automatic if None. Form min max.')
 args = parser.parse_args()
 model = args.model
 qnme = {'+':'QBOW','-':'QBOE'}
@@ -25,8 +26,6 @@ do_daily = False
 sns.set_context('notebook')
 sns.set_style('whitegrid')
 colrs = sns.color_palette('bright')
-
-mls_levels = {'100':'100','200':'215'}
 
 
 def ReadFile(file):
@@ -68,10 +67,16 @@ if args.level is None:
         levslice = {lev:slice(1,100)}
     else:
         levslice = {lev:slice(100,1)}
+    method = None
+elif '-' in args.level:
+    yr_mnth = [int(a) for a in args.level.split('-')]
+    levslice = {'time':yr_mnth[0]-1+(yr_mnth[1]-0.5)/12}
+    method = 'nearest'
 else:
     levslice = {lev:int(args.level)}
-pert = pert.sel(levslice)
-ctrl = ctrl.sel(levslice)
+    method = 'nearest'
+pert = pert.sel(levslice,method=method)
+ctrl = ctrl.sel(levslice,method=method)
 if not 'CLDICE' in pert.data_vars:
     pert['CLDICE'] = 0*pert[Q]
     ctrl['CLDICE'] = 0*ctrl[Q]
@@ -176,11 +181,15 @@ if args.level is None:
 else:
     delta = (pert-ctrl)*1e6*at.Rv/at.Rd #ppmv
     units = 'ppmv'
-    mls_var = 'q{0}_hm'.format(mls_levels[args.level])
-    if args.level == '100':
+    mls_var = 'h2o'
+    if args.level == '70':
+        clevs = 20
+    elif args.level == '100':
         clevs = [0.5,1.0,1.5,2.0] #[250,500,750,1000]
     elif args.level == '200':
         clevs = [5,10,20,50]
+    if args.contours is not None:
+        clevs = np.linspace(args.contours[0],args.contours[1],20)
     #clevs = [-l for l in clevs[::-1]]+clevs
     do_pval = False
 #delta = delta.mean('member')
@@ -194,16 +203,27 @@ if do_daily:
     delta_d = delta_d.mean('member')
     delta_d.attrs['units'] = units
 
-
-mls = fc.ReadMLS(True,args.level).sel(time=slice('0001-01-01',None))
-anom_hm = mls[mls_var].resample(time='1M',label='left',loffset='14D').mean()
-anom_hm = fc.ConvertTime2Years(anom_hm)
+if args.level is None:
+    pure_anom = True
+else:
+    pure_anom = False
+mls = fc.ReadMLS(pure_anom,args.level)
+if 'time' in mls:
+    mls = mls.sel(time=slice('0001-01-01',None))
+    anom_hm = mls[mls_var].resample(time='1M',label='left',loffset='14D').mean()
+    if args.level is not None:
+        anom_hm = anom_hm.groupby('time.month') - mls[mls_var+'_clim']
+    anom_hm = fc.ConvertTime2Years(anom_hm)
+    delta = delta.sel(time=slice(None,anom_hm.time[-1]))
+else:
+    anom_hm = mls[mls_var] - mls[mls_var+'_clim']
 if args.level is None:
     anom_hm = anom_hm*1e3 #mls data is in g/m2 for integrated wv, and ppmv else
 else:
     anom_hm = anom_hm*1e6 #mls data is in ppmv
-    delta = delta.sel(time=slice(None,anom_hm.time[-1]))
 anom_hm.attrs['units'] = units
+#if remove_tropics:
+#    anom_hm = anom_hm - 
 
 ## Ozone
 if model.lower() == 'waccm' and args.level is None:
@@ -217,11 +237,34 @@ if args.qbo is not None and dTCO is not None:
     elif args.qbo == '-':
         dTCO = dTCO.isel(member=qbo_neg)
 
-fig,ax = PlotMass(delta.mean('lon',keep_attrs=True),dTCO,'_'+model.upper(),fig_out = True,do_pval=do_pval)
-appendix = '_{0}_MLS'
-if args.level is not None:
-    appendix = appendix + '_{0}hPa'.format(args.level)
-PlotMass(anom_hm,None,appendix.format(model.upper()),kind='contour',colr=colrs[2],levels=clevs,fig=fig,ax=ax)
+if 'time' in delta.dims:
+    fig,ax = PlotMass(delta.mean('lon',keep_attrs=True),dTCO,'_'+model.upper(),fig_out = True,do_pval=do_pval)
+    appendix = '_{0}_MLS'
+    if args.level is not None:
+        appendix = appendix + '_{0}hPa'.format(args.level)
+    PlotMass(anom_hm,None,appendix.format(model.upper()),kind='contour',colr=colrs[2],levels=clevs,fig=fig,ax=ax)
+else:
+    if args.contours is None:
+        clevs = 20
+    else:
+        clevs = np.linspace(args.contours[0],args.contours[1],20)
+    fig,ax = plt.subplots(ncols=2,figsize=[8,3],sharey=False)
+    delta.Q.mean(['lon','member']).sel(lev=slice(None,100)).plot.contourf(levels=clevs,x='lat',ax=ax[0])
+    #delta.Q.mean(['lon','member']).sel(lev=slice(None,100)).plot(vmax=1,x='lat',ax=ax[0])
+    anom_hm.sel(pres=slice(100,1)).plot.contourf(levels=clevs,x='lat',ax=ax[1])
+    #anom_hm.sel(pres=slice(100,1)).plot(vmax=1,x='lat',ax=ax[1])
+    model_yr = '{0:04d}-{1:02d}'.format(yr_mnth[0]-1,yr_mnth[1])
+    ax[0].set_title('{0} {1}'.format(model.upper(),model_yr))
+    mls_yr = 2021+yr_mnth[0]
+    ax[1].set_title('MLS {0:04d}-{1:02d}'.format(mls_yr,yr_mnth[1]))
+    ac.LogPlot(ax[0])
+    ac.LogPlot(ax[1])
+    ax[1].set_ylabel('')
+    outFile = 'figures/zQ_{0}_MLS_{1}.pdf'.format(model,model_yr)
+    if args.qbo is not None:
+        outFile = fc.RenameQBOFile(outFile,args.qbo)
+    fig.savefig(outFile,bbox_inches='tight',transparent=True)
+    print(outFile)
 
 #delta = delta.mean('member')
 

@@ -28,7 +28,7 @@ PSC_lims = [-3,3]
 
 same_fig = False
 
-do_exp = False
+do_exp = True
 
 qnme = {'+':'W','-':'E'}
 
@@ -82,7 +82,7 @@ if same_fig:
     labl1 = 0.6
     labl2 = 0.43
 else:
-    labl1 = 0.7
+    labl1 = 0.5
     labl2 = 0.63
     fig,ax = plt.subplots()
     fig2,ax2 = plt.subplots()
@@ -131,18 +131,22 @@ if do_exp:
     print(model.upper()+' first {0} months rate = {1:.2f}% per month'.format(nmonths,ppm))
     # then, for the longer term
     fit_years = 5
-    wtime = np.linspace(eps,fit_years-eps,12*fit_years)
-    tqm = 1e-9*tq.mean('member').isel(time=slice(0,12*fit_years))
+    start_fit = 1
+    wtime = np.linspace(start_fit+eps,start_fit+fit_years-eps,12*fit_years)
+    tqm = 1e-9*tq.mean('member').isel(time=slice(start_fit*12,12*(start_fit+fit_years)))
     wlifetime,whalftime,ppm,ppy,amp = fc.ExpFit(wtime,tqm)
     print(model.upper()+' rate [percent per month] = {0:6.2f}'.format(ppm))
-    axs[0].text(0.8,labl1,r'$\tau_{0} = ${1:3.1f} yrs'.format('{1/2}',whalftime),transform=axs[0].transAxes,color='r',backgroundcolor='white')
-    axs[0].plot(tqm.time,np.exp(amp)*np.exp(-wtime/wlifetime),color='r',lw=1,ls=':')
-    nt = len(tq_mls_mn.time)
-    mtime = np.linspace(eps,nt/12-eps,nt)
-    mlifetime,mhalftime,ppm,ppy,amp = fc.ExpFit(mtime,tq_mls_mn)
-    print('MLS rate [percent per month] = {0:6.2f}'.format(ppm))
-    axs[0].text(0.8,labl2,r'$\tau_{0} = ${1:3.1f} yrs'.format('{1/2}',mhalftime),transform=axs[0].transAxes,color=colrs[0],backgroundcolor='white')
-    axs[0].plot(tq_mls_mn.time,np.exp(amp)*np.exp(-mtime/mlifetime),color=colrs[0],lw=1,ls=':')
+    print(model.upper()+' e-folding time = {0:6.2f} years'.format(wlifetime))
+    #axs[0].text(0.8,labl1,r'$\tau_{0} = ${1:3.1f} yrs'.format('{1/2}',whalftime),transform=axs[0].transAxes,color='r',backgroundcolor='white')
+    axs[0].text(0.8,labl1,r'$\tau = ${0:3.1f} yrs'.format(wlifetime),transform=axs[0].transAxes,color=colrs[3],backgroundcolor='white')
+    axs[0].plot(tqm.time,np.exp(amp)*np.exp(-wtime/wlifetime),color=colrs[3],lw=1.5,ls=':')
+    # MLS residence time
+    #nt = len(tq_mls_mn.time)
+    #mtime = np.linspace(eps,nt/12-eps,nt)
+    #mlifetime,mhalftime,ppm,ppy,amp = fc.ExpFit(mtime,tq_mls_mn)
+    #print('MLS rate [percent per month] = {0:6.2f}'.format(ppm))
+    #axs[0].text(0.8,labl2,r'$\tau_{0} = ${1:3.1f} yrs'.format('{1/2}',mhalftime),transform=axs[0].transAxes,color=colrs[0],backgroundcolor='white')
+    #axs[0].plot(tq_mls_mn.time,np.exp(amp)*np.exp(-mtime/mlifetime),color=colrs[0],lw=1,ls=':')
 
 #######
 # figure aesthetics
