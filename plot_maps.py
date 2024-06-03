@@ -17,6 +17,7 @@ parser.add_argument('--qmodel',dest='qbo_model',default=None,help='Use this mode
 parser.add_argument('--seasons',dest='season_overwrite',default=None,nargs='+',help='Overwrite default seasons to plot.')
 parser.add_argument('--center',dest='center_overwrite',default=None,type=float,help='Overwrite default longitude center of plot.')
 parser.add_argument('-v',dest='vars',default=None,nargs='+',help='Plot these variables.')
+parser.add_argument('-y',dest='years',default=None,help='average of this range of years. form startYear,stopYear')
 parser.add_argument('-b',dest='boxes',action='store_false',help='Do NOT plot regional boxes in the maps, and do NOT plot bar plots.')
 args = parser.parse_args()
 model = args.model
@@ -124,6 +125,8 @@ for var in fields:
         avg_years[var] = avg_years['CLDTOT']
     if var not in avg_years.keys():
         avg_years[var]= def_yrs
+    if args.years is not None:
+        avg_years[var] = args.years
 
 vmaxs = {
     'TS': 1.5,
@@ -137,7 +140,7 @@ vmaxs = {
     'DSSC': 5.0,
     'LWCF': 5.0,
     'SWCF': 5.0,
-    'TCWV':None,
+    'TCWV': 0.8,
     'ICEFRAC': None,
     }
 for var in fields:
