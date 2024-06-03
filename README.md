@@ -8,4 +8,4 @@ All figures of the paper can be produced by running
 ```bash
 sh plot_paper_figures_published.sh
 ```
-provided all necessary data is within the working directory.
+provided all necessary data is within the working directory. Also requires [aostools](https://github.com/mjucker/aostools).
